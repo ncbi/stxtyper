@@ -574,7 +574,9 @@ struct ThisApplication : ShellApplication
     if (! blast_bin. empty ())
     {
 	    addDirSlash (blast_bin);
-	    prog2dir ["blastx"] = blast_bin;
+	    prog2dir ["blastx"]      = blast_bin;
+	    prog2dir ["tblastn"]     = blast_bin;
+	    prog2dir ["makeblastdb"] = blast_bin;
 	  }
 
 
@@ -636,13 +638,13 @@ struct ThisApplication : ShellApplication
     QC_ASSERT (dnaLen_max);
     QC_ASSERT (dnaLen_total);
 
-		stderr. section ("Running blastx");
+		stderr. section ("Running blast");
 		{
-			const Chronometer_OnePass_cerr cop ("blastx");
+			const Chronometer_OnePass_cerr cop ("blast");
   		#define BLAST_FMT  "-outfmt '6 qseqid sseqid length nident qstart qend qlen sstart send slen qseq sseq'"
+ 			// Database: created by ~brovervv/code/database/stx.prot.sh
  			findProg ("blastx");
  			// Optmize ??
- 			// Database: created by ~brovervv/code/database/stx.prot.sh
 			exec (fullProg ("blastx") + " -query " + dna_flat + " -db " + execDir + "stx.prot  "  // tmp + "/db/AMRProt" /* /db/stx ??*/  + "  " 
 			      + "-comp_based_stats 0  -evalue 1e-10  -seg no  -max_target_seqs 10000  -word_size 5  -query_gencode " + to_string (gencode) + " "
 			      + getBlastThreadsParam ("blastx", min (nDna, dnaLen_total / 10002)) 

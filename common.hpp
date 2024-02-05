@@ -4581,6 +4581,7 @@ protected:
     // Physically real directory of the software
   mutable KeyValue prog2dir;
   mutable Stderr stderr;
+  time_t startTime {0};
 public:
   
   

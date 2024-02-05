@@ -4009,6 +4009,9 @@ ShellApplication::~ShellApplication ()
 {
 	if (tmpCreated && ! logPtr)
 	  removeDirectory (tmp);
+
+  const time_t endTime = time (NULL);
+  stderr << programName << " took " << endTime - startTime << " seconds to complete\n";
 }
 
 
@@ -4077,6 +4080,8 @@ void ShellApplication::initVar ()
   }
   
   stderr. quiet = getQuiet ();
+
+  startTime = time (NULL);
   stderr << "Running: " << getCommandLine () << '\n';
 
   // threads_max
