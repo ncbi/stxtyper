@@ -524,8 +524,8 @@ struct ThisApplication : ShellApplication
     if (database_version)
       cout   << "Software version: " << version << endl; 
     else
-	    stderr << "Software version: " << version << '\n'; 
 	#endif
+	    stderr << "Software version: " << version << '\n'; 
     
     OFStream::prepare (output);
         
@@ -642,6 +642,7 @@ struct ThisApplication : ShellApplication
   		#define BLAST_FMT  "-outfmt '6 qseqid sseqid length nident qstart qend qlen sstart send slen qseq sseq'"
  			findProg ("blastx");
  			// Optmize ??
+ 			// Database: created by ~brovervv/code/database/stx.prot.sh
 			exec (fullProg ("blastx") + " -query " + dna_flat + " -db " + execDir + "stx.prot  "  // tmp + "/db/AMRProt" /* /db/stx ??*/  + "  " 
 			      + "-comp_based_stats 0  -evalue 1e-10  -seg no  -max_target_seqs 10000  -word_size 5  -query_gencode " + to_string (gencode) + " "
 			      + getBlastThreadsParam ("blastx", min (nDna, dnaLen_total / 10002)) 
