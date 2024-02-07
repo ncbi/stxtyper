@@ -1,3 +1,4 @@
 *.o
 stxtyper
 fasta_check
+stx.prot.*

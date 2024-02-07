@@ -1,5 +1,4 @@
 // stxtyper.cpp
-// --> amr_report.cpp ??
 
 /*===========================================================================
 *
@@ -33,7 +32,8 @@
 * Dependencies: NCBI BLAST, gunzip (optional)
 *
 * Release changes:
-*   1.0.1  02/05/2024 PD-4874
+*   1.0.2  02/06/2024          blastx -> tblastn
+*   1.0.1  02/05/2024 PD-4874  github.com/vbrover/stxtyper
 *   1.0.0  11/21/2023 PD-4798
 *
 */
@@ -55,7 +55,7 @@ using namespace Common_sp;
 
 
 // PAR!
-#define DATA_VER_MIN "2024-01-31.1"  // ??
+//#define DATA_VER_MIN "2024-01-31.1"  // ??
 
 
 
@@ -73,7 +73,6 @@ const string stxS ("stx");
 
 struct BlastAlignment 
 {
-  // BLASTX alignment
   size_t length {0}, nident {0}  // aa
        ,    refStart {0},    refEnd {0},    refLen {0}
        , targetStart {0}, targetEnd {0}, targetLen {0};
@@ -115,32 +114,33 @@ struct BlastAlignment
     	    istringstream iss (line);
     	    iss >> targetName >> sseqid >> length >> nident >> targetStart >> targetEnd >> targetLen >> refStart >> refEnd >> refLen >> targetSeq >> refSeq;
   	  // format:  qseqid       sseqid    length    nident         qstart         qend         qlen      sstart      send      slen         qseq    sseq
-      // blastx:                            733       733          62285        63017        88215         105       837       837          
+      // blast:                             733       733          62285        63017        88215         105       837       837          
         }
   	    QC_ASSERT (! targetSeq. empty ());	
   	    
   	    // sseqid
   	    // 0|EED0303793.1|1|1|stxB2j|stxB2j||1|STX2J|STX2|Shiga_toxin_Stx2j_subunit_B
-  	    string classS;
+  	  //string classS;
   	    string famId;
         try
         {	
-  		  /*product      =*/                    rfindSplit (sseqid, '|'); 
-  		    classS       =                      rfindSplit (sseqid, '|'); 
-  		  /*subclass     =*/                    rfindSplit (sseqid, '|'); 
-  		  /*reportable   =(uchar)*/ str2<int>  (rfindSplit (sseqid, '|')); 
-  		  /*resistance   =*/                    rfindSplit (sseqid, '|'); 
-  		  /*gene         =*/                    rfindSplit (sseqid, '|');  
+  	//  /*product      =*/                    rfindSplit (sseqid, '|'); 
+  	//    classS       =                      rfindSplit (sseqid, '|');   
+  	//  /*subclass     =*/                    rfindSplit (sseqid, '|'); 
+  	//  /*reportable   =(uchar)*/ str2<int>  (rfindSplit (sseqid, '|')); 
+  	//  /*resistance   =*/                    rfindSplit (sseqid, '|'); 
+  	//  /*gene         =*/                    rfindSplit (sseqid, '|');  
   		    famId        =                      rfindSplit (sseqid, '|');  
-  		  /*parts        = (size_t)*/str2<int> (rfindSplit (sseqid, '|'));
-  		  /*part         = (size_t)*/str2<int> (rfindSplit (sseqid, '|'));
+  	//  /*parts        = (size_t)*/str2<int> (rfindSplit (sseqid, '|'));
+  	//  /*part         = (size_t)*/str2<int> (rfindSplit (sseqid, '|'));
   		    refAccession =                      rfindSplit (sseqid, '|');
-  		  /*gi           =*/                    str2<long> (sseqid);  // dummy
+  	//  /*gi           =*/                    str2<long> (sseqid);  // dummy
   		  }
   		  catch (const exception &e)
   		  {
-  		  	throw runtime_error (string ("Bad AMRFinder database\n") + e. what () + "\n" + line);
+  		  	throw runtime_error (string ("Bad StxTyper database\n") + e. what () + "\n" + line);
   		  }
+  		#if 0
   		  if (! (   classS == "STX1" 
   		         || classS == "STX2" 
   		        )
@@ -149,6 +149,7 @@ struct BlastAlignment
   		    stx = false;
   		    return;
   		  }
+  		#endif
         QC_ASSERT (famId. size () == 6);
         QC_ASSERT (isLeft (famId, stxS));
         subunit = famId [3];
@@ -485,11 +486,11 @@ public:
 struct ThisApplication : ShellApplication
 {
   ThisApplication ()
-    : ShellApplication ("Determine stx type(s) of a genome, print .tsv-file", true, true, true)
+    : ShellApplication ("Determine stx type(s) of a genome, print .tsv-file", true, false, true, true)
     {
     	addKey ("nucleotide", "Input nucleotide FASTA file (can be gzipped)", "", 'n', "NUC_FASTA");
-    	addKey ("database", "Alternative directory with AMRFinder database. Default: $AMRFINDER_DB", "", 'd', "DATABASE_DIR");
-    	addFlag ("database_version", "Print database version", 'V');
+    //addKey ("database", "Alternative directory with AMRFinder database. Default: $AMRFINDER_DB", "", 'd', "DATABASE_DIR");
+    //addFlag ("database_version", "Print database version", 'V');
     	addKey ("translation_table", "NCBI genetic code for translated BLAST", "11", 't', "TRANSLATION_TABLE");
       addKey ("name", "Text to be added as the first column \"name\" to all rows of the report, for example it can be an assembly name", "", '\0', "NAME");
       addKey ("output", "Write output to OUTPUT_FILE instead of STDOUT", "", 'o', "OUTPUT_FILE");
@@ -503,8 +504,8 @@ struct ThisApplication : ShellApplication
   void shellBody () const final
   {
     const string  fName            = shellQuote (getArg ("nucleotide"));
-          string  db               =             getArg ("database");
-    const bool    database_version =             getFlag ("database_version");
+  //      string  db               =             getArg ("database");
+  //const bool    database_version =             getFlag ("database_version");
     const uint    gencode          =             arg2uint ("translation_table"); 
                   input_name       =             getArg ("name");
     const string  output           =             getArg ("output");
@@ -514,20 +515,25 @@ struct ThisApplication : ShellApplication
       throw runtime_error ("NAME cannot contain a tab character");
 
 
+  #if 0
     if (database_version)
       cout   << "Software directory: " << shellQuote (execDir) << endl;
     else
+  #endif
       stderr << "Software directory: " << shellQuote (execDir) << '\n';
+  #if 0
     if (database_version)
       cout   << "Software version: " << version << endl; 
     else
-	    stderr << "Software version: " << version << '\n'; 
+	#endif
+	    stderr << /*"Software version: "*/ "Version: " << version << '\n'; 
     
     OFStream::prepare (output);
         
 		const string logFName (tmp + "/log");  // Command-local log file
 
 
+  #if 0
     string defaultDb;
     #ifdef CONDA_DB_DIR
     // we're in condaland
@@ -559,7 +565,10 @@ struct ThisApplication : ShellApplication
 			  db = defaultDb;
 		}
 		ASSERT (! db. empty ());		  
+  #endif
 
+
+    #define BLASTX 0
 
     // blast_bin
     if (blast_bin. empty ())
@@ -568,10 +577,16 @@ struct ThisApplication : ShellApplication
     if (! blast_bin. empty ())
     {
 	    addDirSlash (blast_bin);
-	    prog2dir ["blastx"] = blast_bin;
+	  #if BLASTX
+	    prog2dir ["blastx"]      = blast_bin;
+	  #else
+	    prog2dir ["tblastn"]     = blast_bin;  
+	    prog2dir ["makeblastdb"] = blast_bin;  
+	  #endif
 	  }
 
 
+  #if 0
     const string downloadLatestInstr ("\nTo download the latest version to the default directory run: amrfinder -u");
     
 		if (! directoryExists (db))
@@ -605,39 +620,56 @@ struct ThisApplication : ShellApplication
       if (database_version)
         return;
     }
+  #endif
 
 
     const string qcS (qc_on ? " -qc" : "");
 
     const string dna_flat = uncompress (fName,  "dna_flat");
     
+  #if BLASTX
     size_t nDna = 0;
     size_t dnaLen_max = 0;
     size_t dnaLen_total = 0;
+  #endif
     {
       prog2dir ["fasta_check"] = execDir;
       exec (fullProg ("fasta_check") + dna_flat + "  -hyphen  -ambig  " + qcS + "  -log " + logFName + " > " + tmp + "/nseq", logFName); 
     	const StringVector vec (tmp + "/nseq", (size_t) 10, true); 
     	if (vec. size () != 3)
         throw runtime_error ("fasta_check failed: " + vec. toString ("\n"));
+    #if BLASTX
       nDna         = str2<size_t> (vec [0]);
       dnaLen_max   = str2<size_t> (vec [1]);
       dnaLen_total = str2<size_t> (vec [2]);
+    #endif
     }
+  #if BLASTX
     QC_ASSERT (nDna);
     QC_ASSERT (dnaLen_max);
     QC_ASSERT (dnaLen_total);
+  #endif
 
-		stderr. section ("Running blastx");
+		stderr. section ("Running blast");
 		{
-			const Chronometer_OnePass_cerr cop ("blastx");
-  		#define BLAST_FMT  "-outfmt '6 qseqid sseqid length nident qstart qend qlen sstart send slen qseq sseq'"
+			const Chronometer_OnePass_cerr cop ("blast");
+ 			// Database: created by ~brovervv/code/database/stx.prot.sh
+    #if BLASTX
  			findProg ("blastx");
- 			// Optmize ??
-			exec (fullProg ("blastx") + " -query " + dna_flat + " -db " + tmp + "/db/AMRProt" /* /db/stx ??*/  + "  " 
+  		const string blast_fmt ("-outfmt '6 qseqid sseqid length nident qstart qend qlen sstart send slen qseq sseq'");
+			exec (fullProg ("blastx") + " -query " + dna_flat + " -db " + execDir + "stx.prot  " 
 			      + "-comp_based_stats 0  -evalue 1e-10  -seg no  -max_target_seqs 10000  -word_size 5  -query_gencode " + to_string (gencode) + " "
 			      + getBlastThreadsParam ("blastx", min (nDna, dnaLen_total / 10002)) 
-			      + " " BLAST_FMT " -out " + tmp + "/blastx > /dev/null 2> " + tmp + "/blastx-err", tmp + "/blastx-err");
+			      + " " + blast_fmt + " -out " + tmp + "/blast > /dev/null 2> " + tmp + "/blast-err", tmp + "/blast-err");
+ 		#else
+ 			findProg ("makeblastdb");
+ 			exec (fullProg ("makeblastdb") + "-in " + dna_flat + "  -dbtype nucl  -out " + tmp + "/db  -logfile " + tmp + "/db.log  > /dev/null", tmp + "db.log");
+ 			findProg ("tblastn");
+  		const string blast_fmt ("-outfmt '6 sseqid qseqid length nident sstart send slen qstart qend qlen sseq qseq'");
+			exec (fullProg ("tblastn") + " -query " + execDir + "stx.prot  -db " + tmp + "/db  "
+			      + "-comp_based_stats 0  -evalue 1e-10  -seg no  -max_target_seqs 10000  -word_size 5  -db_gencode " + to_string (gencode) 
+			      + " " + blast_fmt + " -out " + tmp + "/blast > /dev/null 2> " + tmp + "/blast-err", tmp + "/blast-err");
+		#endif
 		}
 
 
@@ -662,7 +694,7 @@ struct ThisApplication : ShellApplication
     stxClass2identity ["2o"] = 0.98;
     
     
-    ostream* tsvOut = & cout;
+    ostream* tsvOut = & cout;  // --> ShellApplication ??
     unique_ptr<ostream> tsvOutS;
     if (! output. empty ())
     {
@@ -692,7 +724,7 @@ struct ThisApplication : ShellApplication
 
 	  Vector<BlastAlignment> blastAls;   
     {
-      LineInput f (tmp + "/blastx");
+      LineInput f (tmp + "/blast");
   	  while (f. nextLine ())
   	  {
   	    const Unverbose unv;

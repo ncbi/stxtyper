@@ -81,7 +81,7 @@ CXX=g++
 COMPILE.cpp= $(CXX) $(CPPFLAGS) $(SVNREV) $(DBDIR) $(TEST_UPDATE_DB) -c 
 
 
-.PHONY: all clean install release 
+.PHONY: all clean install release
 
 BINARIES= stxtyper fasta_check 
 
@@ -90,6 +90,9 @@ all:	$(BINARIES)
 release: clean
 	svnversion . > version.txt
 	make all
+
+#db: stx.prot
+#	makeblastdb  -in stx.prot  -dbtype prot > /dev/null
 
 common.o:	common.hpp common.inc
 
