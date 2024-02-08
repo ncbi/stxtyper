@@ -1,0 +1,22 @@
+name: Linux C++ CI
+
+on:
+  workflow_dispatch:
+  push:
+  pull_request:
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: prerequisites
+      run: |
+          sudo apt-get update
+          sudo apt-get install -y ncbi-blast+
+    - name: make
+      run: make
+    - name: test
+      run: ./test_stxtyper.sh
