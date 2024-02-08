@@ -1639,6 +1639,26 @@ struct OFStream : ofstream
 
 
 
+struct Cout : Singleton<Cout>
+{
+  unique_ptr<OFStream> f;
+  
+  
+  explicit Cout (const string &fName)
+    { if (! fName. empty ())
+        f. reset (new OFStream (fName));
+    }
+    
+  
+  ostream& operator* ()
+    { if (f)
+        return *f;
+      return cout;
+    }
+};
+
+
+
 inline streamsize double2decimals (double r)
   { return r ? (streamsize) max<long> (0, (long) (ceil (- log10 (fabs (r)) + 1))) : 0; }
 
