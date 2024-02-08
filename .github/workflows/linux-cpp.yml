@@ -12,6 +12,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+    - name: prerequisites
+      run: |
+          sudo apt-get update
+          sudo apt-get install -y ncbi-blast+
     - name: make
       run: make
 #    - name: make test

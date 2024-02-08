@@ -49,10 +49,6 @@ ifneq '$(DEFAULT_DB_DIR)' ''
 	DBDIR := -D'CONDA_DB_DIR="$(DEFAULT_DB_DIR)"'
 endif
 
-# for testing database updates using 
-ifdef TEST_UPDATE
-	TEST_UPDATE_DB := '-D TEST_UPDATE'
-endif
 
 # detect system architecture and set appropriate flags
 # this is probably not the best way (i.e. M1 Mac would be arm64)
@@ -86,10 +82,6 @@ COMPILE.cpp= $(CXX) $(CPPFLAGS) $(SVNREV) $(DBDIR) $(TEST_UPDATE_DB) -c
 BINARIES= stxtyper fasta_check 
 
 all:	$(BINARIES)
-
-release: clean
-	svnversion . > version.txt
-	make all
 
 #db: stx.prot
 #	makeblastdb  -in stx.prot  -dbtype prot > /dev/null
@@ -139,5 +131,5 @@ github_binaries:
 	rm -r $(GITHUB_FILE)/*
 	rmdir $(GITHUB_FILE)
 
-#test : $(DISTFILES) Makefile *.cpp *.hpp *.inc test_dna.fa test_prot.fa test_prot.gff test_dna.fa test_dna.expected test_prot.expected test_both.expected
-#	./test_stxtyper.sh
+test : $(DISTFILES) Makefile *.cpp *.hpp *.inc test/*
+	./test_stxtyper.sh
