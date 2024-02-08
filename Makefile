@@ -131,5 +131,5 @@ github_binaries:
 	rm -r $(GITHUB_FILE)/*
 	rmdir $(GITHUB_FILE)
 
-test : $(DISTFILES) Makefile *.cpp *.hpp *.inc test/*
+test : $(DISTFILES) Makefile *.cpp *.hpp *.inc test/* $(BINARIES)
 	./test_stxtyper.sh
