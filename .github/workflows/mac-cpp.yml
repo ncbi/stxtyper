@@ -16,3 +16,5 @@ jobs:
                   brew install blast
             - name: make
               run: make
+            - name: test
+              run: make test
