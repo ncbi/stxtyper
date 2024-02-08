@@ -17,4 +17,4 @@ jobs:
             - name: make
               run: make
             - name: test
-              run: make test
+              run: ./test_stxtyper.sh
