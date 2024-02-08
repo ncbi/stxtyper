@@ -1,0 +1,19 @@
+name: MacOS C++ CI
+
+on:
+    workflow_dispatch:
+    push:
+    pull_request:
+
+jobs:
+    build:
+        runs-on: macos-latest
+        steps:
+            - uses: actions/checkout@v3
+            - name: prerequisites
+              run: |
+                  /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
+                  brew install blast
+                  brew install hmmer
+            - name: make
+              run: make
