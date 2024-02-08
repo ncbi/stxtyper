@@ -23,7 +23,7 @@ make test
 stxtyper -n nucleotide.fa
 ```
 
-### Output
+## Output
 
 The output of StxTyper is a tab-delimited file with the following fields, all percent identity and coverage metrics are measured in proportion of amino-acids.
 
