@@ -32,7 +32,8 @@
 * Dependencies: NCBI BLAST, gunzip (optional)
 *
 * Release changes:
-*          02/08/2024 PD-4887  A stand-alone blast hit supresses a covered blast hit if the reported gene symbol is the same
+*   1.0.4  02/08/2024          Stable choice of a blast hit among equivalent ones
+*          02/08/2024 PD-4887  A stand-alone blast hit suppresses a covered blast hit if the reported gene symbol is the same
 *                              "STANDARD" -> "COMPLETE"
 *                              PARTIAL_CONTIG_END is detected for separate A and B subunits
 *   1.0.3  02/07/2024 PD-4874  strand is '+' or '-'
@@ -70,7 +71,7 @@ string input_name;
 map<string,double> stxClass2identity;
 
 // PAR
-constexpr size_t intergenic_max {36};  // ??
+constexpr size_t intergenic_max {36};  // Max. intergenic region in the reference set + 2
 constexpr size_t slack = 30;  
 
 const string stxS ("stx");
@@ -253,7 +254,7 @@ struct BlastAlignment
              || (targetLen - targetEnd <= 3 /*Locus::end_delta*/ && ((targetStrand && refEnd < refLen) || (! targetStrand && refStart)));
     }
   bool otherTruncated () const
-    { constexpr size_t missed_max = intergenic_max + 3 * 20 /*min. domain length*/;
+    { constexpr size_t missed_max = intergenic_max + 3 * 20 /*min. domain length*/;  // PAR
       return    (targetStrand == (subunit == 'B') && targetStart           <= missed_max)
              || (targetStrand == (subunit == 'A') && targetLen - targetEnd <= missed_max);
     }
@@ -311,6 +312,7 @@ struct BlastAlignment
       LESS_PART (*b, *a, getAbsCoverage ());
       LESS_PART (*b, *a, nident);
       LESS_PART (*a, *b, targetStart);
+      LESS_PART (*a, *b, refAccession);
       return false;
     }
 };
@@ -405,6 +407,8 @@ private:
     { return al1->targetStrand ? al1 : al2; }
   const BlastAlignment* getB () const
     { return al1->targetStrand ? al2 : al1; }
+  bool hasAl2 () const
+    { return al2; }
   string getStxType () const
     { if (! al2)
         return al1->stxType;
@@ -461,6 +465,10 @@ public:
       LESS_PART (a, b, al1->targetStart);
       LESS_PART (a, b, al1->targetEnd);
       LESS_PART (b, a, al1->targetStrand);
+      LESS_PART (b, a, al1->refAccession);
+      LESS_PART (b, a, hasAl2 ());
+      if (a. al2 && b. al2)
+        LESS_PART (b, a, al2->refAccession);
       return false;
     }
 };
