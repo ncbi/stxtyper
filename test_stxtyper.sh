@@ -50,4 +50,4 @@ else
         echo "ok: test/synthetics.fa"
     fi
 fi
-echo "ok, all tests passed"
+echo "ok: all tests passed"

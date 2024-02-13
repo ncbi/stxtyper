@@ -22,7 +22,7 @@ jobs:
               uses: actions/upload-artifact@v4
               if: ${{ failure() }} # only run if the job fails
               with:
-                name: build-and-test-artifact
+                name: stxtyper-failed-test-macos
                 path: |
                     ./*
                     test/*
