@@ -9,12 +9,22 @@ jobs:
     build:
         runs-on: macos-latest
         steps:
-            - uses: actions/checkout@v3
+            - uses: actions/checkout@v4
             - name: prerequisites
               run: |
-                  /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
-                  brew install blast
+                /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
+                brew install blast
             - name: make
               run: make
             - name: test
               run: ./test_stxtyper.sh
+            - name: Upload artifacts on failure
+              uses: actions/upload-artifact@v4
+              if: ${{ failure() }} # only run if the job fails
+              with:
+                name: stxtyper-failed-test-macos
+                path: |
+                    ./*
+                    test/*
+                retention-days: 14
+

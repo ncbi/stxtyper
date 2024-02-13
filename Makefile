@@ -77,7 +77,7 @@ CXX=g++
 COMPILE.cpp= $(CXX) $(CPPFLAGS) $(SVNREV) $(DBDIR) $(TEST_UPDATE_DB) -c 
 
 
-.PHONY: all clean install release
+.PHONY: all clean install release test
 
 BINARIES= stxtyper fasta_check 
 
