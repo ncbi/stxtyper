@@ -17,11 +17,27 @@ make test
 
 # Usage
 
+## `stxtyper -n <assembled_nucleotide.fa> [<options>]`
+
 ### Example
 
 ```
 stxtyper -n nucleotide.fa
 ```
+
+## Parameters
+
+- `-nucleotide <nucleotide_fasta>` or `-n <nucleotide_fasta>` Assembled nucleotide sequence to search in FASTA format.
+
+- `--name <assembly_identifier>` Add an identifier as the first column in each row of the report. This is useful when combining results for many assemblies.
+
+- `--output <output_file>` or `-o <output_file>` Write the output to \<output\_file\> instead of STDOUT
+
+- `--blast_bin <path>` Directory to search for tblastn binary. Overrides environment variable `$BLAST_BIN` and the default PATH.
+
+- `-q` or `--quiet` Suppress the status messages normally written to STDERR.
+
+- `--log <log_file>` Error log file, appended and opened when you first run the application. This is used for debugging
 
 ## Output
 
