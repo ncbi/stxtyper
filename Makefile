@@ -91,12 +91,12 @@ common.o:	common.hpp common.inc
 stxtyper.o:  common.hpp common.inc 
 stxtyperOBJS=stxtyper.o common.o tsv.o
 stxtyper:	$(stxtyperOBJS)
-	$(COMPILE.cpp) -o $@ $(stxtyperOBJS) -pthread $(DBDIR)
+	$(CXX) -o $@ $(stxtyperOBJS) -pthread $(DBDIR)
 
 fasta_check.o:	common.hpp common.inc 
 fasta_checkOBJS=fasta_check.o common.o 
 fasta_check:	$(fasta_checkOBJS)
-	$(COMPILE.cpp) -o $@ $(fasta_checkOBJS)
+	$(CXX) -o $@ $(fasta_checkOBJS)
 
 
 clean:
