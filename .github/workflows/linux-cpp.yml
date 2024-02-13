@@ -25,5 +25,5 @@ jobs:
       if: ${{ failure() }} # only run if the job fails
       with: 
         name: build-and-test-artifact
-        path: *
+        path: test/* stxtyper fasta_check stx.prot Makefile version.txt
         retention-days: 14
