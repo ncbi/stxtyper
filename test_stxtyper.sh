@@ -26,6 +26,8 @@ else
         echo "#  To approve run:"
         echo "#     mv test/basic.got test/basic.expected "
         exit 1
+    else
+        echo "ok: test/basic.fa"
     fi
 fi
 
@@ -44,6 +46,8 @@ else
         echo "#  To approve run:"
         echo "#     mv test/synthetics.got test/synthetics.expected "
         exit 1
+    else
+        echo "ok: test/synthetics.fa"
     fi
 fi
 echo "ok, all tests passed"
