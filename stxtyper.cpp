@@ -32,6 +32,8 @@
 * Dependencies: NCBI BLAST, gunzip (optional)
 *
 * Release changes:
+*   1.0.6  02/13/2024 PD-4874  --translation_table is removed
+*          02/13/2024 PD-4894  EXTENDED operon type
 *          02/13/2024 PD-4892  Subunits A and B are not preferred to be of the same stx class
 *   1.0.5  02/12/2024 PD-4891  -v == --version
 *                              stable choice of a blast hit among equivalent ones
@@ -525,7 +527,7 @@ struct ThisApplication : ShellApplication
     : ShellApplication ("Determine stx type(s) of a genome, print .tsv-file", true, false, true, true)
     {
     	addKey ("nucleotide", "Input nucleotide FASTA file (can be gzipped)", "", 'n', "NUC_FASTA");
-    	addKey ("translation_table", "NCBI genetic code for translated BLAST", "11", 't', "TRANSLATION_TABLE");
+   //addKey ("translation_table", "NCBI genetic code for translated BLAST", "11", 't', "TRANSLATION_TABLE");
       addKey ("name", "Text to be added as the first column \"name\" to all rows of the report, for example it can be an assembly name", "", '\0', "NAME");
       addKey ("output", "Write output to OUTPUT_FILE instead of STDOUT", "", 'o', "OUTPUT_FILE");
     	addKey ("blast_bin", "Directory for BLAST. Deafult: $BLAST_BIN", "", '\0', "BLAST_DIR");
@@ -538,7 +540,7 @@ struct ThisApplication : ShellApplication
   void shellBody () const final
   {
     const string fName      = shellQuote (getArg ("nucleotide"));
-    const uint   gencode    =             arg2uint ("translation_table"); 
+    const uint   gencode    =             /*arg2uint ("translation_table")*/ 11; 
                  input_name =             getArg ("name");
     const string output     =             getArg ("output");
           string blast_bin  =             getArg ("blast_bin");
