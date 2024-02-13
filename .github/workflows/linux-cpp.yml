@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: prerequisites
       run: |
           sudo apt-get update
@@ -25,5 +25,7 @@ jobs:
       if: ${{ failure() }} # only run if the job fails
       with: 
         name: build-and-test-artifact
-        path: test/* stxtyper fasta_check stx.prot Makefile version.txt
+        path: |
+            ./*
+            test/* 
         retention-days: 14
