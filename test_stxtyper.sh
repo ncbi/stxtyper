@@ -50,4 +50,25 @@ else
         echo "ok: test/synthetics.fa"
     fi
 fi
+
+
+if ! $STXTYPER -n test/virulence_ecoli.fa > test/virulence_ecoli.got
+then
+    echo "not ok: $STXTYPER returned a non-zero exit value indicating a failure of the software"
+    echo "#  $STXTYPER -n test/virulence_ecoli.fa > test/virulence_ecoli.got"
+    exit 1
+else
+    if ! diff -q test/virulence_ecoli.expected test/virulence_ecoli.got
+    then
+        echo "not ok: $STXTYPER returned output different from expected"
+        echo "#  $STXTYPER -n test/virulence_ecoli.fa > test/virulence_ecoli.got"
+        echo "# diff test/virulence_ecoli.expected test/virulence_ecoli.got"
+        diff test/virulence_ecoli.expected test/virulence_ecoli.got
+        echo "#  To approve run:"
+        echo "#     mv test/virulence_ecoli.got test/virulence_ecoli.expected "
+        exit 1
+    else
+        echo "ok: test/virulence_ecoli.fa"
+    fi
+fi
 echo "ok: all tests passed"
