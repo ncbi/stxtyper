@@ -49,6 +49,7 @@ The output of StxTyper is a tab-delimited file with the following fields, all pe
     - __STANDARD__ (soon to be "COMPLETE") for complete and fully typeable known stx types
     - __PARTIAL__ for partial operons that are internal to contigs and not terminating at contig boundaries
     - __PARTIAL_CONTIG_END__ for partial operons that could be split by contig boundaries due to sequencing or assembly artifacts
+    - __EXTENDED__ Where the coding sequence would extend beyond the stop codon for the reference protein
     - __INTERNAL_STOP__ for Stx operons where one of the subunits has a nonsense mutation
     - __FRAMESHIFT__ where StxTyper detected an indel in the coding sequence that would cause a frame shift in one or more of the subunits
     - __NOVEL__ a full-length stx operon that is not typeable using the current scheme
