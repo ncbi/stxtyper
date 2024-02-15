@@ -32,6 +32,7 @@
 * Dependencies: NCBI BLAST, gunzip (optional)
 *
 * Release changes:
+*   1.0.7  02.15/2024 PD-4897  extend intergenic region for partial operons
 *   1.0.6  02/13/2024 PD-4874  --translation_table is removed
 *          02/13/2024 PD-4894  EXTENDED operon type
 *          02/13/2024 PD-4892  Subunits A and B are not preferred to be of the same stx class
@@ -846,7 +847,7 @@ struct ThisApplication : ShellApplication
           if (! al1->targetStrand)
             swap (al1, al2);
           if (   al1->targetEnd < al2->targetStart
-              && al2->targetStart - al1->targetEnd <= intergenic_max
+              && al2->targetStart - al1->targetEnd <= intergenic_max * 2  // PAR  // PD-4897
              )
           {
             Operon op (*al1, *al2);
