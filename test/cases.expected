@@ -1,0 +1,2 @@
+#target_contig	stx_type	operon	identity	target_start	target_stop	target_strand	A_reference	A_identity	A_coverage	B_reference	B_identity	B_coverage
+PD-4797_multirow	stx1	PARTIAL	99.75	1625	2852	-	AAA71893.1	99.68	100.00	AAA71894.1	100.00	86.67
