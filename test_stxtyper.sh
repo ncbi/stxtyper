@@ -11,64 +11,52 @@ else
     STXTYPER=./stxtyper
 fi
 
-if ! $STXTYPER -n test/basic.fa > test/basic.got
+FAILURES=0
+TESTS=4
+
+function test_input_file {
+    local test_base=$1
+    if ! $STXTYPER -n "test/$test_base.fa" > "test/$test_base.got"
+    then
+        echo "not ok: $STXTYPER returned a non-zero exit value indicating a failure of the software"
+        echo "#  $STXTYPER -n test/$test_base.fa > test/$test_base.got"
+        return 1
+    else
+        if ! diff -q "test/$test_base.expected" "test/$test_base.got"
+        then
+            echo "not ok: $STXTYPER returned output different from expected"
+            echo "#  $STXTYPER -n test/basic.fa > test/basic.got"
+            echo "# diff test/$test_base.expected test/$test_base.got"
+            diff "test/$test_base.expected" "test/$test_base.got"
+            echo "#  To approve run:"
+            echo "#     mv test/$test_base.got test/$test_base.expected "
+            return 1
+        else
+            echo "ok: test/$test_base.fa"
+            return 0
+        fi
+    fi
+}
+
+test_input_file 'basic'
+FAILURES=$(( $? + $FAILURES ))
+
+test_input_file 'synthetics'
+FAILURES=$(( $? + $FAILURES ))
+
+test_input_file 'virulence_ecoli'
+FAILURES=$(( $? + $FAILURES ))
+
+test_input_file 'cases'
+FAILURES=$(( $? + $FAILURES ))
+
+echo "Done."
+echo ""
+if [ "$FAILURES" -gt 0 ]
 then
-    echo "not ok: $STXTYPER returned a non-zero exit value indicating a failure of the software"
-    echo "#  $STXTYPER -n test/basic.fa > test/basic.got"
+    PASSED=$(( $TESTS - $FAILURES ))
+    echo "not ok overall: $FAILURES out of $TESTS tests failed"
     exit 1
 else
-    if ! diff -q test/basic.expected test/basic.got
-    then
-        echo "not ok: $STXTYPER returned output different from expected"
-        echo "#  $STXTYPER -n test/basic.fa > test/basic.got"
-        echo "# diff test/basic.expected test/basic.got"
-        diff test/basic.expected test/basic.got
-        echo "#  To approve run:"
-        echo "#     mv test/basic.got test/basic.expected "
-        exit 1
-    else
-        echo "ok: test/basic.fa"
-    fi
+    echo "ok: all $TESTS tests passed"
 fi
-
-if ! $STXTYPER -n test/synthetics.fa > test/synthetics.got
-then
-    echo "not ok: $STXTYPER returned a non-zero exit value indicating a failure of the software"
-    echo "#  $STXTYPER -n test/synthetics.fa > test/synthetics.got"
-    exit 1
-else
-    if ! diff -q test/synthetics.expected test/synthetics.got
-    then
-        echo "not ok: $STXTYPER returned output different from expected"
-        echo "#  $STXTYPER -n test/synthetics.fa > test/synthetics.got"
-        echo "# diff test/synthetics.expected test/synthetics.got"
-        diff test/synthetics.expected test/synthetics.got
-        echo "#  To approve run:"
-        echo "#     mv test/synthetics.got test/synthetics.expected "
-        exit 1
-    else
-        echo "ok: test/synthetics.fa"
-    fi
-fi
-
-
-if ! $STXTYPER -n test/virulence_ecoli.fa > test/virulence_ecoli.got
-then
-    echo "not ok: $STXTYPER returned a non-zero exit value indicating a failure of the software"
-    echo "#  $STXTYPER -n test/virulence_ecoli.fa > test/virulence_ecoli.got"
-    exit 1
-else
-    if ! diff -q test/virulence_ecoli.expected test/virulence_ecoli.got
-    then
-        echo "not ok: $STXTYPER returned output different from expected"
-        echo "#  $STXTYPER -n test/virulence_ecoli.fa > test/virulence_ecoli.got"
-        echo "# diff test/virulence_ecoli.expected test/virulence_ecoli.got"
-        diff test/virulence_ecoli.expected test/virulence_ecoli.got
-        echo "#  To approve run:"
-        echo "#     mv test/virulence_ecoli.got test/virulence_ecoli.expected "
-        exit 1
-    else
-        echo "ok: test/virulence_ecoli.fa"
-    fi
-fi
-echo "ok: all tests passed"
