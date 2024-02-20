@@ -32,9 +32,9 @@
 * Dependencies: NCBI BLAST, gunzip (optional)
 *
 * Release changes:
-*   1.0.8  02/16/2024 PD-4892  steps: (1) find operons where A subtype = B subtype and operon identity >= threshold
-*                                     (2) find other operons where operon identity >= threshold
-*                                     (3) find other operons
+*   1.0.8  02/16/2024 PD-4892, PD-4898  steps: (1) find operons where A subtype = B subtype and operon identity >= threshold
+*                                              (2) find other operons where operon identity >= threshold for each subunit
+*                                              (3) find other operons
 *   1.0.7  02.15/2024 PD-4897  extend intergenic region for partial operons
 *   1.0.6  02/13/2024 PD-4874  --translation_table is removed
 *          02/13/2024 PD-4894  EXTENDED operon type
@@ -584,7 +584,11 @@ void goodBlasts2operons (const VectorPtr<BlastAlignment> &goodBlastAls,
           *logPtr << "Operon:" << '\t' << op. getIdentity () << '\t' << stxClass2identity [op. al1->stxClass] << endl;  
           op. saveTsvOut (logTd, true);  
         }
-        if (! strong || op. getIdentity () >= stxClass2identity [op. al1->stxClass])
+        if (   ! strong 
+            || (   op. getIdentity () >= stxClass2identity [op. al1->stxClass]
+                && op. getIdentity () >= stxClass2identity [op. al2->stxClass]
+               )
+           )
         {
           operons << std::move (op);
           var_cast (al1) -> reported = true;
