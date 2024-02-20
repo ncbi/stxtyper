@@ -32,6 +32,9 @@
 * Dependencies: NCBI BLAST, gunzip (optional)
 *
 * Release changes:
+*   1.0.8  02/16/2024 PD-4892  steps: (1) find operons where A subtype = B subtype and operon identity >= threshold
+*                                     (2) find other operons where operon identity >= threshold
+*                                     (3) find other operons
 *   1.0.7  02.15/2024 PD-4897  extend intergenic region for partial operons
 *   1.0.6  02/13/2024 PD-4874  --translation_table is removed
 *          02/13/2024 PD-4894  EXTENDED operon type
@@ -288,37 +291,43 @@ struct BlastAlignment
       s += string (len - refEnd, '-'); 
       return s;
     }
-  static bool frameshiftLess (const BlastAlignment& a,
-                              const BlastAlignment& b)
-    { LESS_PART (a, b, targetName);
-      LESS_PART (a, b, targetStrand);
-      LESS_PART (a, b, refAccession);
-      LESS_PART (a, b, targetStart);
-      LESS_PART (a, b, targetEnd);
+  static bool frameshiftLess (const BlastAlignment* a,
+                              const BlastAlignment* b)
+    { ASSERT (a);
+      ASSERT (b);
+      ASSERT (! a->reported);
+      ASSERT (! b->reported);
+      LESS_PART (*a, *b, targetName);
+      LESS_PART (*a, *b, targetStrand);
+      LESS_PART (*a, *b, refAccession);
+      LESS_PART (*a, *b, targetStart);
+      LESS_PART (*a, *b, targetEnd);
       return false;
     }
-  bool operator< (const BlastAlignment &other) const
-    { LESS_PART (*this, other, targetName);
-      LESS_PART (*this, other, targetStrand);
-    //LESS_PART (*this, other, stxClass);
-      LESS_PART (*this, other, subunit);
-      LESS_PART (*this, other, targetStart);
-    //LESS_PART (other, *this, nident);
-      LESS_PART (*this, other, getDiff ());
-      LESS_PART (*this, other, refAccession);
-      return false;
-    }
-  // For VectorPtr
-  static bool stxLess (const BlastAlignment* a,
-                       const BlastAlignment* b)
+  static bool sameTypeLess (const BlastAlignment* a,
+                            const BlastAlignment* b) 
     { ASSERT (a);
       ASSERT (b);
       LESS_PART (*a, *b, reported);
       LESS_PART (*a, *b, targetName);
       LESS_PART (*a, *b, targetStrand);
+      LESS_PART (*a, *b, stxClass);
       LESS_PART (*a, *b, subunit);
       LESS_PART (*a, *b, targetStart);
-    //LESS_PART (*b, *a, nident);
+      LESS_PART (*a, *b, getDiff ());
+      LESS_PART (*a, *b, refAccession);
+      return false;
+    }
+  static bool less (const BlastAlignment* a,
+                    const BlastAlignment* b) 
+    // = sameTypeLess(), but without stxClass
+    { ASSERT (a);
+      ASSERT (b);
+    //LESS_PART (*a, *b, reported);
+      LESS_PART (*a, *b, targetName);
+      LESS_PART (*a, *b, targetStrand);
+      LESS_PART (*a, *b, subunit);
+      LESS_PART (*a, *b, targetStart);
       LESS_PART (*a, *b, getDiff ());
       LESS_PART (*a, *b, refAccession);
       return false;
@@ -331,7 +340,6 @@ struct BlastAlignment
       LESS_PART (*a, *b, targetName);
       LESS_PART (*a, *b, targetStrand);
       LESS_PART (*b, *a, getAbsCoverage ());
-    //LESS_PART (*b, *a, nident);
       LESS_PART (*a, *b, getDiff ());
       LESS_PART (*a, *b, targetStart);
       LESS_PART (*a, *b, refAccession);
@@ -379,7 +387,7 @@ struct Operon
       if (al2)
       {
         string stxType (getStxType (verboseP));
-        const string standard (/*"STANDARD"*/ "COMPLETE");
+        const string standard ("COMPLETE");
         const bool novel =    al1->stxClass != al2->stxClass 
                            || getIdentity () < stxClass2identity [al1->stxClass]
                            || stxType. size () <= 1;
@@ -519,6 +527,100 @@ public:
 
 
 
+void goodBlasts2operons (const VectorPtr<BlastAlignment> &goodBlastAls, 
+                         Vector<Operon> &operons, 
+                         bool sameType,
+                         bool strong,
+                         TsvOut &logTd)
+{
+  IMPLY (sameType, strong);
+  
+  if (logPtr)
+    *logPtr << endl << "Good blasts:" << endl;
+
+  size_t start = 0;
+  FFOR (size_t, i, goodBlastAls. size ())
+  {
+    const BlastAlignment* alB = goodBlastAls [i];
+    ASSERT (alB);
+    if (alB->reported)
+      continue;
+    alB->saveTsvOut (logTd, true);
+    if (alB->subunit != 'B')
+      continue;
+    while (   start < i 
+           && ! (   goodBlastAls [start] -> targetName   == alB->targetName
+                 && goodBlastAls [start] -> targetStrand == alB->targetStrand
+                 && (   ! sameType 
+                     || goodBlastAls [start] -> stxClass == alB->stxClass
+                    )
+                )
+          )
+      start++;
+    FOR_START (size_t, j, start, i)
+    {
+      const BlastAlignment* alA = goodBlastAls [j];
+      ASSERT (alA);
+      if (alA->reported)
+        continue;
+      ASSERT (alA->targetName   == alB->targetName);
+      ASSERT (alA->targetStrand == alB->targetStrand);
+      IMPLY (sameType, alA->stxClass == alB->stxClass);
+      ASSERT (alA->subunit <= alB->subunit);
+      if (alA->subunit == alB->subunit)
+        break;
+      ASSERT (alA->subunit == 'A');
+      const BlastAlignment* al1 = alA;
+      const BlastAlignment* al2 = alB;
+      if (! al1->targetStrand)
+        swap (al1, al2);
+      if (   al1->targetEnd <= al2->targetStart  
+          && al2->targetStart - al1->targetEnd <= intergenic_max * (strong ? 1 : 2)  // PAR  // PD-4897
+         )
+      {
+        Operon op (*al1, *al2);
+        if (logPtr)
+        {
+          *logPtr << "Operon:" << '\t' << op. getIdentity () << '\t' << stxClass2identity [op. al1->stxClass] << endl;  
+          op. saveTsvOut (logTd, true);  
+        }
+        if (! strong || op. getIdentity () >= stxClass2identity [op. al1->stxClass])
+        {
+          operons << std::move (op);
+          var_cast (al1) -> reported = true;
+          var_cast (al2) -> reported = true;
+        }
+      }
+    }
+  }
+  
+  if (logPtr)
+  {
+    *logPtr << "# Operons: " << operons. size () << endl;
+	  *logPtr << endl << "Suppress goodBlastAls by operons" << endl;
+	}
+
+  for (const BlastAlignment* al : goodBlastAls)
+  {
+    ASSERT (al);
+    if (! al->reported)
+      for (const Operon& op : operons)
+      {
+        ASSERT (op. al2);
+        if (   al->targetName          == op. al1->targetName
+            && al->targetStart + slack >= op. al1->targetStart 
+            && al->targetEnd           <= op. al2->targetEnd + slack
+            && al->targetStrand        == op. al1->targetStrand
+           ) 
+        {
+          var_cast (al) -> reported = true;
+          break;
+        }
+      }
+  }
+}
+
+
 
 // ThisApplication
 
@@ -528,7 +630,7 @@ struct ThisApplication : ShellApplication
     : ShellApplication ("Determine stx type(s) of a genome, print .tsv-file", true, false, true, true)
     {
     	addKey ("nucleotide", "Input nucleotide FASTA file (can be gzipped)", "", 'n', "NUC_FASTA");
-   //addKey ("translation_table", "NCBI genetic code for translated BLAST", "11", 't', "TRANSLATION_TABLE");
+    //addKey ("translation_table", "NCBI genetic code for translated BLAST", "11", 't', "TRANSLATION_TABLE");
       addKey ("name", "Text to be added as the first column \"name\" to all rows of the report, for example it can be an assembly name", "", '\0', "NAME");
       addKey ("output", "Write output to OUTPUT_FILE instead of STDOUT", "", 'o', "OUTPUT_FILE");
     	addKey ("blast_bin", "Directory for BLAST. Deafult: $BLAST_BIN", "", '\0', "BLAST_DIR");
@@ -668,7 +770,7 @@ struct ThisApplication : ShellApplication
        ; 
     td. newLn ();
 
-	  Vector<BlastAlignment> blastAls;   
+	  VectorOwn<BlastAlignment> blastAls;   
     {
       LineInput f (blastOut);
   	  while (f. nextLine ())
@@ -676,9 +778,9 @@ struct ThisApplication : ShellApplication
   	    const Unverbose unv;
   	    if (logPtr)
   	      *logPtr << f. line << endl;
-  	    BlastAlignment al (f. line);
-  	    al. qc ();  
- 	      blastAls << std::move (al);
+  	    auto al = new BlastAlignment (f. line);
+  	    al->qc ();  
+ 	      blastAls << al;
   	  }
   	}
   	
@@ -691,23 +793,24 @@ struct ThisApplication : ShellApplication
       // Multiple frame shifts are possible
       blastAls. sort (BlastAlignment::frameshiftLess); 
       const BlastAlignment* prev = nullptr;
-      for (const BlastAlignment& al : blastAls)
+      for (const BlastAlignment* al : blastAls)
       {        
+        ASSERT (al);
         if (   prev
-            && al. targetName   == prev->targetName
-            && al. targetStrand == prev->targetStrand
-            && al. refAccession == prev->refAccession
-            && al. targetStart  >  prev->targetStart
-            && (int) al. targetStart - (int) prev->targetEnd < 10  // PAR
-            && al. getFrame () != prev->getFrame ()
+            && al->targetName   == prev->targetName
+            && al->targetStrand == prev->targetStrand
+            && al->refAccession == prev->refAccession
+            && al->targetStart  >  prev->targetStart
+            && (int) al->targetStart - (int) prev->targetEnd < 10  // PAR
+            && al->getFrame () != prev->getFrame ()
            )
         {
-          var_cast (al). merge (*prev);
-          al. qc ();
+          var_cast (al) -> merge (*prev);
+          al->qc ();
           var_cast (prev) -> reported = true;
         }
-        al. saveTsvOut (logTd, true);
-        prev = & al;
+        al->saveTsvOut (logTd, true);
+        prev = al;
       }
     }
     
@@ -715,34 +818,37 @@ struct ThisApplication : ShellApplication
       *logPtr << "All blasts:" << endl;
 	  VectorPtr<BlastAlignment> goodBlastAls;   
 	  {
+      blastAls. sort (BlastAlignment::sameTypeLess);
 	    size_t start = 0;
-      blastAls. sort ();
       FFOR (size_t, i, blastAls. size ())
       {
-        const BlastAlignment& al = blastAls [i];
+        const BlastAlignment* al = blastAls [i];
+        ASSERT (al);
         while (   start < i 
-               && ! (   blastAls [start]. targetName   == al. targetName
-                     && blastAls [start]. targetStrand == al. targetStrand
-                   //&& blastAls [start]. stxClass     == al. stxClass
-                     && blastAls [start]. subunit      == al. subunit
-                     && blastAls [start]. targetEnd    >  al. targetStart
+               && ! (   blastAls [start] -> targetName   == al->targetName
+                     && blastAls [start] -> targetStrand == al->targetStrand
+                     && blastAls [start] -> stxClass     == al->stxClass
+                     && blastAls [start] -> subunit      == al->subunit
+                     && blastAls [start] -> targetEnd    >  al->targetStart
                     )
               )
           start++;
-        if (al. reported)
-          continue;
-        al. saveTsvOut (logTd, true);
+        if (al->reported)
+          break; 
+        al->saveTsvOut (logTd, true);
         bool suppress = false;
         FOR_START (size_t, j, start, i)
         {
-          const BlastAlignment& prev = blastAls [j];
-          ASSERT (al. targetName   == prev. targetName);
-          ASSERT (al. targetStrand == prev. targetStrand);
-        //ASSERT (al. stxClass     == prev. stxClass);
-          ASSERT (al. subunit      == prev. subunit);
-          if (   al. insideEq (prev)
-            //&& al. nident <= prev. nident
-              && al. getDiff () >= prev. getDiff ()
+          const BlastAlignment* prev = blastAls [j];
+          ASSERT (prev);
+          ASSERT (! prev->reported);
+          ASSERT (al->targetName   == prev->targetName);
+          ASSERT (al->targetStrand == prev->targetStrand);
+          ASSERT (al->stxClass     == prev->stxClass);
+          ASSERT (al->subunit      == prev->subunit);
+          if (   al->insideEq (*prev)
+              && al->getDiff () >= prev->getDiff ()
+            //&& al->getIdentity () <= prev-> getIdentity ()
              )
           {
             suppress = true;
@@ -750,117 +856,25 @@ struct ThisApplication : ShellApplication
           }
         }
         if (! suppress)
-          goodBlastAls << & al;
+          goodBlastAls << al;
       }
     }
     
-    if (logPtr)
-      *logPtr << endl << "Good blasts:" << endl;
     Vector<Operon> operons;
-	  {
-	    size_t start = 0;
-      FFOR (size_t, i, goodBlastAls. size ())
-      {
-        const BlastAlignment* alB = goodBlastAls [i];
-        ASSERT (alB);
-        alB->saveTsvOut (logTd, true);
-        if (alB->subunit != 'B')
-          continue;
-        while (   start < i 
-               && ! (   goodBlastAls [start] -> targetName   == alB->targetName
-                     && goodBlastAls [start] -> targetStrand == alB->targetStrand
-                   //&& goodBlastAls [start] -> stxClass     == alB->stxClass
-                    )
-              )
-          start++;
-        FOR_START (size_t, j, start, i)
-        {
-          const BlastAlignment* alA = goodBlastAls [j];
-          ASSERT (alA);
-          ASSERT (alA->targetName   == alB->targetName);
-          ASSERT (alA->targetStrand == alB->targetStrand);
-        //ASSERT (alA->stxClass     == alB->stxClass);
-          ASSERT (alA->subunit      <= alB->subunit);
-          if (alA->subunit == alB->subunit)
-            break;
-          ASSERT (alA->subunit == 'A');
-          const BlastAlignment* al1 = alA;
-          const BlastAlignment* al2 = alB;
-          if (! al1->targetStrand)
-            swap (al1, al2);
-          if (   al1->targetEnd <= al2->targetStart  
-              && al2->targetStart - al1->targetEnd <= intergenic_max
-             )
-          {
-            Operon op (*al1, *al2);
-            if (logPtr)
-            {
-              *logPtr << "Operon:" << '\t' << op. getIdentity () << '\t' << stxClass2identity [op. al1->stxClass] << endl;  
-              op. saveTsvOut (logTd, true);  
-            }
-            if (op. getIdentity () >= stxClass2identity [op. al1->stxClass])
-            {
-              operons << std::move (op);
-              var_cast (al1) -> reported = true;
-              var_cast (al2) -> reported = true;
-            }
-          }
-        }
-      }
-    }
-  	if (logPtr)
-  	  *logPtr << "# Operons: " << operons. size () << endl;
+
+    if (logPtr)
+      *logPtr << endl << "Same type operons:" << endl;
+    goodBlasts2operons (goodBlastAls, operons, true, true, logTd);
+    
+    goodBlastAls. sort (BlastAlignment::less);
+
+    if (logPtr)
+      *logPtr << endl << "Strong operons:" << endl;
+    goodBlasts2operons (goodBlastAls, operons, false, true, logTd);
 
     if (logPtr)
       *logPtr << endl << "Weak operons:" << endl;
-	  {
-	    size_t start = 0;
-	    goodBlastAls. sort (BlastAlignment::stxLess);
-      FFOR (size_t, i, goodBlastAls. size ())
-      {
-        const BlastAlignment* alB = goodBlastAls [i];
-        ASSERT (alB);
-        if (alB->reported)
-          break;
-        alB->saveTsvOut (logTd, true);
-        if (alB->subunit != 'B')
-          continue;
-        while (   start < i 
-               && ! (   goodBlastAls [start] -> targetName   == alB->targetName
-                     && goodBlastAls [start] -> targetStrand == alB->targetStrand
-                    )
-              )
-          start++;
-        FOR_START (size_t, j, start, i)
-        {
-          const BlastAlignment* alA = goodBlastAls [j];
-          ASSERT (alA);
-        //ASSERT (! alA->reported);
-          ASSERT (alA->targetName   == alB->targetName);
-          ASSERT (alA->targetStrand == alB->targetStrand);
-          ASSERT (alA->subunit      <= alB->subunit);
-          if (alA->subunit == alB->subunit)
-            break;
-          ASSERT (alA->subunit == 'A');
-          const BlastAlignment* al1 = alA;
-          const BlastAlignment* al2 = alB;
-          if (! al1->targetStrand)
-            swap (al1, al2);
-          if (   al1->targetEnd < al2->targetStart
-              && al2->targetStart - al1->targetEnd <= intergenic_max * 2  // PAR  // PD-4897
-             )
-          {
-            Operon op (*al1, *al2);
-            op. saveTsvOut (logTd, true);  
-            operons << std::move (op);
-            var_cast (al1) -> reported = true;
-            var_cast (al2) -> reported = true;
-          }
-        }
-      }
-    }
-  	if (logPtr)
-  	  *logPtr << "# Operons: " << operons. size () << endl;
+    goodBlasts2operons (goodBlastAls, operons, false, false, logTd);
    	  
   	if (logPtr)
   	  *logPtr << endl << "goodOperons" << endl;
@@ -872,7 +886,6 @@ struct ThisApplication : ShellApplication
      	  op. saveTsvOut (logTd, true); 
        	op. qc ();     
         bool found = false;
-        // Order by targetName, targetStart for speed ??
         for (const Operon& goodOp : goodOperons)
           if (   op. al1->targetName == goodOp. al1->targetName
               && op. insideEq (goodOp)
@@ -885,27 +898,6 @@ struct ThisApplication : ShellApplication
         if (! found)
           goodOperons << op;          
       }      
-    }
-
-  	if (logPtr)
-  	  *logPtr << endl << "Suppress goodBlastAls by goodOperons" << endl;
-    for (const BlastAlignment* al : goodBlastAls)
-    {
-      ASSERT (al);
-      if (! al->reported)
-        for (const Operon& op : goodOperons)
-        {
-          ASSERT (op. al2);
-          if (   al->targetName          == op. al1->targetName
-              && al->targetStart + slack >= op. al1->targetStart 
-              && al->targetEnd           <= op. al2->targetEnd + slack
-              && al->targetStrand        == op. al1->targetStrand
-             ) 
-          {
-            var_cast (al) -> reported = true;
-            break;
-          }
-        }
     }
 
   	if (logPtr)
@@ -931,8 +923,8 @@ struct ThisApplication : ShellApplication
         if (   ! al2->reported
             && al2->insideEq (*al1)
             && (   al2->stxType [0] == al1->stxType [0] 
-              //|| al2->nident <= al1->nident
                 || al2->getDiff () >= al1->getDiff ()
+              //|| al1->getIdentity () >= al2->getIdentity ()
                )
            )
           var_cast (al2) -> reported = true;
