@@ -6,6 +6,10 @@ StxTyper is used to determine stx type from nucleotide sequence.
 
 # Installation
 
+## Prerequisites
+
+StxTyper needs BLAST binaries in your path (specifically tblastn). See https://www.ncbi.nlm.nih.gov/books/NBK569861/ for instructions to install BLAST binaries.
+
 ## Compiling
 
 ```
@@ -52,7 +56,7 @@ The output of StxTyper is a tab-delimited file with the following fields, all pe
     - __EXTENDED__ Where the coding sequence would extend beyond the stop codon for the reference protein
     - __INTERNAL_STOP__ for Stx operons where one of the subunits has a nonsense mutation
     - __FRAMESHIFT__ where StxTyper detected an indel in the coding sequence that would cause a frame shift in one or more of the subunits
-    - __NOVEL__ a full-length stx operon that is not typeable using the current scheme
+    - __COMPLETE_NOVEL__ a full-length stx operon that is not typeable using the current scheme
 4. __identity__ The combined percent identity for both A and B subunits
 5. __target_start__ The detected start of the alignments
 6. __target_stop__ The detected end of the alignments
