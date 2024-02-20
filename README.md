@@ -6,6 +6,10 @@ StxTyper is used to determine stx type from nucleotide sequence.
 
 # Installation
 
+## Prerequisites
+
+StxTyper needs BLAST binaries in your path (specifically tblastn). See https://www.ncbi.nlm.nih.gov/books/NBK569861/ for instructions to install BLAST binaries.
+
 ## Compiling
 
 ```
