@@ -89,7 +89,7 @@ all:	$(BINARIES)
 common.o:	common.hpp common.inc
 
 stxtyper.o:  common.hpp common.inc 
-stxtyperOBJS=stxtyper.o common.o tsv.o
+stxtyperOBJS=stxtyper.o common.o
 stxtyper:	$(stxtyperOBJS)
 	$(CXX) -o $@ $(stxtyperOBJS) -pthread $(DBDIR)
 
