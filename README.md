@@ -8,7 +8,25 @@ StxTyper is used to determine stx type from nucleotide sequence.
 
 ## Prerequisites
 
-StxTyper needs BLAST binaries in your path (specifically tblastn). See https://www.ncbi.nlm.nih.gov/books/NBK569861/ for instructions to install BLAST binaries.
+### C compiler and make
+
+These generally come standard for unix systems, if not the user will need make and GCC. MacOS users will need to go to the [App store and install Xcode](https://apps.apple.com/in/app/xcode/id497799835?mt=12). 
+
+### BLAST
+
+StxTyper needs BLAST binaries in your path (specifically tblastn). If you don't already have BLAST installed see https://www.ncbi.nlm.nih.gov/books/NBK569861/ for instructions to install BLAST binaries.
+
+Blast can also be installed using bioconda by first installing bioconda, then making sure to activate the environment in which it's installed. 
+- See the [official install miniconda instructions for Linux](https://docs.conda.io/en/latest/miniconda.html)
+- See the [official install miniconda instructions for MacOS](https://docs.conda.io/en/latest/miniconda.html)
+
+Then run:
+
+    source ~/miniconda3/bin/activate
+    conda create -y -c conda-forge -c bioconda -n blast blast
+    conda activate blast
+
+If you install BLAST via conda in this way you will need to run `conda activate blast` before you can run StxTyper.
 
 ## Compiling
 
