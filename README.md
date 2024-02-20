@@ -30,22 +30,18 @@ If you install BLAST via conda in this way you will need to run `conda activate 
 
 ## Compiling
 
-```
-git clone https://github.com/evolarjun/stxtyper.git
-cd stxtyper
-make
-make test
-```
+    git clone https://github.com/evolarjun/stxtyper.git
+    cd stxtyper
+    make
+    make test
 
 # Usage
 
-## `stxtyper -n <assembled_nucleotide.fa> [<options>]`
+     stxtyper -n <assembled_nucleotide.fa> [<options>]
 
 ### Example
 
-```
-stxtyper -n nucleotide.fa
-```
+    stxtyper -n nucleotide.fa
 
 ## Parameters
 
