@@ -25,7 +25,7 @@ function test_input_file {
         if ! diff -q "test/$test_base.expected" "test/$test_base.got"
         then
             echo "not ok: $STXTYPER returned output different from expected"
-            echo "#  $STXTYPER -n test/basic.fa > test/basic.got"
+            echo "#  $STXTYPER -n test/$test_base.fa > test/$test_base.got"
             echo "# diff test/$test_base.expected test/$test_base.got"
             diff "test/$test_base.expected" "test/$test_base.got"
             echo "#  To approve run:"
