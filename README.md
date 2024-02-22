@@ -10,7 +10,7 @@ StxTyper is used to determine stx type from nucleotide sequence.
 
 ### C compiler and make
 
-These generally come standard for unix systems, if not the user will need make
+These generally come standard for unix systems, if not the user will need to intall make
 and GCC. MacOS users will need to go to the [App store and install
 Xcode](https://apps.apple.com/in/app/xcode/id497799835?mt=12). 
 
