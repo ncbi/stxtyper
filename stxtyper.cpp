@@ -32,6 +32,8 @@
 * Dependencies: NCBI BLAST, gunzip (optional)
 *
 * Release changes:
+*                     PD-4897  single subunit operons are de-redundified
+*   1.0.10 02/22/2024 PD-4901  multiple types for the same protein sequence are allowed; only Flemming's reference proteins are used
 *   1.0.9  02/16/2024 PD-4901  new database (includes Flemming's data)
 *   1.0.8  02/16/2024 PD-4892, PD-4898  steps: (1) find operons where A subtype = B subtype and operon identity >= threshold
 *                                              (2) find other operons where operon identity >= threshold for each subunit
@@ -903,6 +905,44 @@ struct ThisApplication : ShellApplication
         if (! found)
           goodOperons << op;          
       }      
+    }
+
+	  {
+	    size_t start = 0;
+      FFOR (size_t, i, goodBlastAls. size ())
+      {
+        const BlastAlignment* al = goodBlastAls [i];
+        ASSERT (al);
+        if (al->reported)
+          continue; 
+        while (   start < i 
+               && ! (   goodBlastAls [start] -> targetName   == al->targetName
+                     && goodBlastAls [start] -> targetStrand == al->targetStrand
+                     && goodBlastAls [start] -> subunit      == al->subunit
+                     && goodBlastAls [start] -> targetEnd    >  al->targetStart
+                    )
+              )
+          start++;
+        al->saveTsvOut (logTd, true);
+        FOR_START (size_t, j, start, i)
+        {
+          const BlastAlignment* prev = goodBlastAls [j];
+          ASSERT (prev);
+          if (prev->reported)
+            continue;
+          ASSERT (al->targetName   == prev->targetName);
+          ASSERT (al->targetStrand == prev->targetStrand);
+          ASSERT (al->subunit      == prev->subunit);
+          if (   al->insideEq (*prev)
+              && al->getDiff () >= prev->getDiff ()
+            //&& al->getIdentity () <= prev-> getIdentity ()
+             )
+          {
+            var_cast (al) -> reported = true;
+            break;
+          }
+        }
+      }
     }
 
   	if (logPtr)
