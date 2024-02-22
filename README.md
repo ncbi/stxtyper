@@ -6,24 +6,42 @@ StxTyper is used to determine stx type from nucleotide sequence.
 
 # Installation
 
+## Prerequisites
+
+### C compiler and make
+
+These generally come standard for unix systems, if not the user will need make and GCC. MacOS users will need to go to the [App store and install Xcode](https://apps.apple.com/in/app/xcode/id497799835?mt=12). 
+
+### BLAST
+
+StxTyper needs BLAST binaries in your path (specifically tblastn). If you don't already have BLAST installed see https://www.ncbi.nlm.nih.gov/books/NBK569861/ for instructions to install BLAST binaries.
+
+Blast can also be installed using bioconda by first installing bioconda, then making sure to activate the environment in which it's installed. 
+- See the [official install miniconda instructions for Linux](https://docs.conda.io/en/latest/miniconda.html)
+- See the [official install miniconda instructions for MacOS](https://docs.conda.io/en/latest/miniconda.html)
+
+Then run:
+
+    source ~/miniconda3/bin/activate
+    conda create -y -c conda-forge -c bioconda -n blast blast
+    conda activate blast
+
+If you install BLAST via conda in this way you will need to run `conda activate blast` before you can run StxTyper.
+
 ## Compiling
 
-```
-git clone https://github.com/evolarjun/stxtyper.git
-cd stxtyper
-make
-make test
-```
+    git clone https://github.com/evolarjun/stxtyper.git
+    cd stxtyper
+    make
+    make test
 
 # Usage
 
-## `stxtyper -n <assembled_nucleotide.fa> [<options>]`
+     stxtyper -n <assembled_nucleotide.fa> [<options>]
 
 ### Example
 
-```
-stxtyper -n nucleotide.fa
-```
+    stxtyper -n nucleotide.fa
 
 ## Parameters
 
@@ -52,7 +70,7 @@ The output of StxTyper is a tab-delimited file with the following fields, all pe
     - __EXTENDED__ Where the coding sequence would extend beyond the stop codon for the reference protein
     - __INTERNAL_STOP__ for Stx operons where one of the subunits has a nonsense mutation
     - __FRAMESHIFT__ where StxTyper detected an indel in the coding sequence that would cause a frame shift in one or more of the subunits
-    - __NOVEL__ a full-length stx operon that is not typeable using the current scheme
+    - __COMPLETE_NOVEL__ a full-length stx operon that is not typeable using the current scheme
 4. __identity__ The combined percent identity for both A and B subunits
 5. __target_start__ The detected start of the alignments
 6. __target_stop__ The detected end of the alignments
