@@ -1,8 +1,8 @@
-# This is for development purposes only. Please do not use for research, public health, or god forbid diagnostic purposes because we are still developing and testing this software.
+# This is for development purposes only. Please beware of using this for research, public health, or diagnostic purposes because we are still developing and testing this software and it may have errors.
 
 # StxTyper
 
-StxTyper is used to determine stx type from nucleotide sequence. 
+StxTyper is used to determine stx type from nucleotide sequence. Stx (shiga-toxin) genes are found in some strains of _Escherichia coli_ and code for powerful toxins that can cause severe illness. StxTyper is software to classify these genes from assembled sequence using a standard algorithm.
 
 # Installation
 
@@ -10,7 +10,7 @@ StxTyper is used to determine stx type from nucleotide sequence.
 
 ### C compiler and make
 
-These generally come standard for unix systems, if not the user will need make
+These generally come standard for unix systems, if not the user will need to intall make
 and GCC. MacOS users will need to go to the [App store and install
 Xcode](https://apps.apple.com/in/app/xcode/id497799835?mt=12). 
 
