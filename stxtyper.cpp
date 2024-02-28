@@ -32,7 +32,7 @@
 * Dependencies: NCBI BLAST, gunzip (optional)
 *
 * Release changes:
-*                     PD-4897  single subunit operons are de-redundified
+*                     PD-4897  single-subunit operons are de-redundified
 *   1.0.10 02/22/2024 PD-4901  multiple types for the same protein sequence are allowed; only Flemming's reference proteins are used
 *   1.0.9  02/16/2024 PD-4901  new database (includes Flemming's data)
 *   1.0.8  02/16/2024 PD-4892, PD-4898  steps: (1) find operons where A subtype = B subtype and operon identity >= threshold
@@ -400,16 +400,6 @@ struct Operon
                                     :    getA () -> stopCodon 
                                       || getB () -> stopCodon 
                                       ? "INTERNAL_STOP"
-                                    #if 0
-                                      : partial ()
-                                        ?    getA () -> truncated () 
-                                          || getB () -> truncated ()
-                                          ? "PARTIAL_CONTIG_END"
-                                          : "PARTIAL"  
-                                        : novel
-                                          ? standard + "_NOVEL"
-                                          : standard;
-                                    #endif
                                       :    getA () -> truncated () 
                                         || getB () -> truncated ()
                                         ? "PARTIAL_CONTIG_END"
@@ -421,10 +411,15 @@ struct Operon
                                             : novel
                                               ? standard + "_NOVEL"
                                               : standard;
-        if (   operonType != standard
-            && stxType. size () >= 2
-           )
-          stxType. erase (1);  
+        if (! verboseP)
+        {
+          ASSERT (stxType. size () <= 2);
+          if (operonType == standard)
+            { ASSERT (stxType. size () == 2); }
+          else
+            if (stxType. size () == 2)
+              stxType. erase (1);  
+        }
         if (! input_name. empty ())
   	      td << input_name;
   	    td << al1->targetName
@@ -907,6 +902,7 @@ struct ThisApplication : ShellApplication
       }      
     }
 
+    // De-redundify single-subunit operons
 	  {
 	    size_t start = 0;
       FFOR (size_t, i, goodBlastAls. size ())
@@ -928,8 +924,6 @@ struct ThisApplication : ShellApplication
         {
           const BlastAlignment* prev = goodBlastAls [j];
           ASSERT (prev);
-          if (prev->reported)
-            continue;
           ASSERT (al->targetName   == prev->targetName);
           ASSERT (al->targetStrand == prev->targetStrand);
           ASSERT (al->subunit      == prev->subunit);
@@ -946,7 +940,7 @@ struct ThisApplication : ShellApplication
     }
 
   	if (logPtr)
-  	  *logPtr << endl << "goodBlastAls -> goodOperons" << endl;
+  	  *logPtr << endl << "goodBlastAls -> goodOperons (single-subunit)" << endl;
     goodBlastAls. sort (BlastAlignment::reportLess); 
     FFOR (size_t, i, goodBlastAls. size ())
     {
