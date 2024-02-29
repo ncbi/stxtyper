@@ -55,8 +55,8 @@ echo ""
 if [ "$FAILURES" -gt 0 ]
 then
     PASSED=$(( $TESTS - $FAILURES ))
-    echo "not ok overall: $FAILURES out of $TESTS tests failed"
+    echo "not ok overall: $FAILURES out of $TESTS stxtyper tests failed"
     exit 1
 else
-    echo "ok: all $TESTS tests passed"
+    echo "ok: all $TESTS stxtyper tests passed"
 fi
