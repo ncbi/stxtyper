@@ -80,6 +80,7 @@ COMPILE.cpp= $(CXX) $(CPPFLAGS) $(SVNREV) $(DBDIR) $(TEST_UPDATE_DB) -c
 .PHONY: all clean install release test
 
 BINARIES= stxtyper fasta_check 
+DATABASE= stx.prot
 
 all:	$(BINARIES)
 
@@ -108,11 +109,11 @@ install:
 	then \
 		mkdir -p $(DESTDIR)$(bindir); \
 	fi
-	$(INSTALL) $(BINARIES) $(DESTDIR)$(bindir)
+	$(INSTALL) $(BINARIES) $(DATABASE) $(DESTDIR)$(bindir) 
 
 # stxtyper binaries for github binary release
 GITHUB_FILE=stxtyper_binaries_v$(VERSION_STRING)
-GITHUB_FILES = $(BINARIES)
+GITHUB_FILES = $(BINARIES) $(DATABASE)
 github_binaries:
 	@if [ ! -e version.txt ]; \
 	then \
