@@ -32,6 +32,8 @@
 * Dependencies: NCBI BLAST, gunzip (optional)
 *
 * Release changes:
+*   1.0.12 02/29/2024          TsvOut.live() is used
+*   1.0.11 02/28/2024 PD-4911  wrong QC for log file output
 *                     PD-4897  single-subunit operons are de-redundified
 *   1.0.10 02/22/2024 PD-4901  multiple types for the same protein sequence are allowed; only Flemming's reference proteins are used
 *   1.0.9  02/16/2024 PD-4901  new database (includes Flemming's data)
@@ -207,7 +209,9 @@ struct BlastAlignment
     }
   void saveTsvOut (TsvOut& td,
                    bool verboseP) const 
-    { if (! input_name. empty ())
+    { if (! td. live ())
+        return;
+      if (! input_name. empty ())
   	    td << input_name;
       td << targetName
          << (stxS + (verboseP ? (subunit + stxType) : string (1, stxType [0])))
@@ -387,6 +391,8 @@ struct Operon
   void saveTsvOut (TsvOut& td,
                    bool verboseP) const 
     { ASSERT (al1);
+      if (! td. live ())
+        return;
       if (al2)
       {
         string stxType (getStxType (verboseP));
@@ -533,8 +539,7 @@ void goodBlasts2operons (const VectorPtr<BlastAlignment> &goodBlastAls,
 {
   IMPLY (sameType, strong);
   
-  if (logPtr)
-    *logPtr << endl << "Good blasts:" << endl;
+  LOG ("\nGood blasts:");
 
   size_t start = 0;
   FFOR (size_t, i, goodBlastAls. size ())
@@ -577,11 +582,8 @@ void goodBlasts2operons (const VectorPtr<BlastAlignment> &goodBlastAls,
          )
       {
         Operon op (*al1, *al2);
-        if (logPtr)
-        {
-          *logPtr << "Operon:" << '\t' << op. getIdentity () << '\t' << stxClass2identity [op. al1->stxClass] << endl;  
-          op. saveTsvOut (logTd, true);  
-        }
+        LOG ("Operon:\t" + to_string (op. getIdentity ()) + "\t" + to_string (stxClass2identity [op. al1->stxClass]));
+        op. saveTsvOut (logTd, true);  
         if (   ! strong 
             || (   op. getIdentity () >= stxClass2identity [op. al1->stxClass]
                 && op. getIdentity () >= stxClass2identity [op. al2->stxClass]
@@ -596,11 +598,8 @@ void goodBlasts2operons (const VectorPtr<BlastAlignment> &goodBlastAls,
     }
   }
   
-  if (logPtr)
-  {
-    *logPtr << "# Operons: " << operons. size () << endl;
-	  *logPtr << endl << "Suppress goodBlastAls by operons" << endl;
-	}
+  LOG ("# Operons: " + to_string (operons. size ()));
+  LOG ("\nSuppress goodBlastAls by operons");
 
   for (const BlastAlignment* al : goodBlastAls)
   {
@@ -778,19 +777,15 @@ struct ThisApplication : ShellApplication
   	  while (f. nextLine ())
   	  {
   	    const Unverbose unv;
-  	    if (logPtr)
-  	      *logPtr << f. line << endl;
+  	    LOG (f. line);
   	    auto al = new BlastAlignment (f. line);
   	    al->qc ();  
  	      blastAls << al;
   	  }
   	}
   	
-  	if (logPtr)
-  	{
-  	  *logPtr << "# All stx blasts: " << blastAls. size () << endl;
-      *logPtr << "Finding frame shifts:" << endl;
-    }
+  	LOG ("# All stx blasts: " + to_string (blastAls. size ()));
+    LOG ("Finding frame shifts:");
 	  {
       // Multiple frame shifts are possible
       blastAls. sort (BlastAlignment::frameshiftLess); 
@@ -816,8 +811,7 @@ struct ThisApplication : ShellApplication
       }
     }
     
-    if (logPtr)
-      *logPtr << "All blasts:" << endl;
+    LOG ("All blasts:");
 	  VectorPtr<BlastAlignment> goodBlastAls;   
 	  {
       blastAls. sort (BlastAlignment::sameTypeLess);
@@ -864,22 +858,18 @@ struct ThisApplication : ShellApplication
     
     Vector<Operon> operons;
 
-    if (logPtr)
-      *logPtr << endl << "Same type operons:" << endl;
+    LOG ("\nSame type operons:");
     goodBlasts2operons (goodBlastAls, operons, true, true, logTd);
     
     goodBlastAls. sort (BlastAlignment::less);
 
-    if (logPtr)
-      *logPtr << endl << "Strong operons:" << endl;
+    LOG ("\nStrong operons:");
     goodBlasts2operons (goodBlastAls, operons, false, true, logTd);
 
-    if (logPtr)
-      *logPtr << endl << "Weak operons:" << endl;
+    LOG ("\nWeak operons:");
     goodBlasts2operons (goodBlastAls, operons, false, false, logTd);
    	  
-  	if (logPtr)
-  	  *logPtr << endl << "goodOperons" << endl;
+  	LOG ("\ngoodOperons");
     Vector<Operon> goodOperons;
     {    
       operons. sort ();
@@ -939,8 +929,7 @@ struct ThisApplication : ShellApplication
       }
     }
 
-  	if (logPtr)
-  	  *logPtr << endl << "goodBlastAls -> goodOperons (single-subunit)" << endl;
+  	LOG ("\ngoodBlastAls -> goodOperons (single-subunit)");
     goodBlastAls. sort (BlastAlignment::reportLess); 
     FFOR (size_t, i, goodBlastAls. size ())
     {
