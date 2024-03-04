@@ -1,4 +1,4 @@
-# This is for development purposes only. Please beware of using this for research, public health, or diagnostic purposes because we are still developing and testing this software and it may have errors.
+# This is for development purposes only. Please do not use this for research, public health, or diagnostic purposes because we are still developing and testing this software and it may have errors or change at any time.
 
 # StxTyper
 
