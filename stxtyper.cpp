@@ -32,7 +32,8 @@
 * Dependencies: NCBI BLAST, gunzip (optional)
 *
 * Release changes:
-*   1.0.13 03/04/2024 PD-4910  --amrfinder prints output in the AMRFinderPlus format
+*   1.0.14 03/05/2024 PD-4918  --print_node: Print AMRFinderPlus hierarchy node
+*   1.0.13 03/05/2024 PD-4910  --amrfinder prints output in the AMRFinderPlus format
 *   1.0.12 02/29/2024          TsvOut.live() is used
 *   1.0.11 02/28/2024 PD-4911  wrong QC for log file output
 *                     PD-4897  single-subunit operons are de-redundified
@@ -79,6 +80,7 @@ namespace
 
 string input_name;
 bool amrfinder = false;
+bool print_node = false;
 map<string,double> stxClass2identity;
 
 // PAR
@@ -219,7 +221,7 @@ struct BlastAlignment
                    bool verboseP) const 
     { if (! td. live ())
         return;
-      const string stxType_reported (stxS + (verboseP ? (subunit + stxType) : string (1, stxType [0])));
+      const string stxType_reported (verboseP ? getGenesymbol () : (stxS + stxType. substr (0, 1)));
       const string operon (frameshift 
                              ? "FRAMESHIFT"
                              : stopCodon 
@@ -266,6 +268,8 @@ struct BlastAlignment
            << na               //21 "HMM id"
            << na               //22 "HMM description"
            ;
+        if (print_node)
+          td << getGenesymbol ();
       }
       else
       {
@@ -292,6 +296,8 @@ struct BlastAlignment
     }
     
 
+  string getGenesymbol () const
+    { return stxS + subunit + stxType; }
   void merge (const BlastAlignment &prev)
     { ASSERT (targetName   == prev. targetName);
       ASSERT (refAccession == prev. refAccession);
@@ -492,6 +498,7 @@ struct Operon
           const double refCoverage = double (al1->getAbsCoverage () + al2->getAbsCoverage ()) / double (refLen) * 100.0;
           const size_t alignmentLen = al1->length + al2->length;
           const string refAccessions (al1->refAccession + ", " + al2->refAccession);
+          const string fam (al1->getGenesymbol () + ", " + al2->getGenesymbol ());
           td << na                // 1 "Protein identifier"  
              << targetName        // 2 "Contig id"
              << start             // 3 "Start"
@@ -515,6 +522,8 @@ struct Operon
              << na                //21 "HMM id"
              << na                //22 "HMM description"
              ;
+          if (print_node)
+            td << fam;
         }
         else
     	    td << targetName
@@ -725,6 +734,7 @@ struct ThisApplication : ShellApplication
       addKey ("output", "Write output to OUTPUT_FILE instead of STDOUT", "", 'o', "OUTPUT_FILE");
     	addKey ("blast_bin", "Directory for BLAST. Deafult: $BLAST_BIN", "", '\0', "BLAST_DIR");
     	addFlag ("amrfinder", "Print output in the nucleotide AMRFinderPlus format");
+    	addFlag ("print_node", "Print AMRFinderPlus hierarchy node");
 
       version = SVN_REV;
     }
@@ -739,9 +749,12 @@ struct ThisApplication : ShellApplication
     const string output     =             getArg ("output");
           string blast_bin  =             getArg ("blast_bin");
                  amrfinder  =             getFlag ("amrfinder");
+                 print_node =             getFlag ("print_node");
     
     if (contains (input_name, '\t'))
       throw runtime_error ("NAME cannot contain a tab character");
+    if (print_node && ! amrfinder)
+      throw runtime_error ("--print_node requires --amrfinder");
 
 
     stderr << "Software directory: " << shellQuote (execDir) << '\n';
@@ -847,6 +860,7 @@ struct ThisApplication : ShellApplication
     if (! input_name. empty ())
       td << "name";
     if (amrfinder)
+    {
       td << /* 1*/ "Protein identifier"  
          << /* 2*/ "Contig id"
          << /* 3*/ "Start"
@@ -870,6 +884,9 @@ struct ThisApplication : ShellApplication
          << /*21*/ "HMM id"
          << /*22*/ "HMM description"
          ;
+      if (print_node)
+        td << "Hierarchy node";  
+    }
     else
       td << "target_contig"
          << "stx_type"
