@@ -32,7 +32,7 @@
 * Dependencies: NCBI BLAST, gunzip (optional)
 *
 * Release changes:
-*   1.0.14 03/05/2024 PD-4918  --print_node: Print AMRFinderPlus hierarchy node
+*   1.0.14 03/05/2024 PD-4918  --print_node: print AMRFinderPlus hierarchy node
 *   1.0.13 03/05/2024 PD-4910  --amrfinder prints output in the AMRFinderPlus format
 *   1.0.12 02/29/2024          TsvOut.live() is used
 *   1.0.11 02/28/2024 PD-4911  wrong QC for log file output
