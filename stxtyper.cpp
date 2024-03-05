@@ -32,6 +32,7 @@
 * Dependencies: NCBI BLAST, gunzip (optional)
 *
 * Release changes:
+*   1.0.13 03/04/2024 PD-4910  --amrfinder prints output in the AMRFinderPlus format
 *   1.0.12 02/29/2024          TsvOut.live() is used
 *   1.0.11 02/28/2024 PD-4911  wrong QC for log file output
 *                     PD-4897  single-subunit operons are de-redundified
@@ -77,6 +78,7 @@ namespace
 
 
 string input_name;
+bool amrfinder = false;
 map<string,double> stxClass2identity;
 
 // PAR
@@ -84,6 +86,7 @@ constexpr size_t intergenic_max {36};  // Max. intergenic region in the referenc
 constexpr size_t slack = 30;  
 
 const string stxS ("stx");
+const string na ("na");
 
 
 
@@ -102,6 +105,7 @@ struct BlastAlignment
   string targetSeq;  
   bool targetStrand {true}; 
     // false <=> negative
+  size_t targetAlign_aa {0};
   
   // Reference
   // Whole sequence ends with '*'
@@ -176,6 +180,10 @@ struct BlastAlignment
 	    refStart--;
 	    targetStart--;
 	    
+      targetAlign_aa = targetEnd - targetStart;
+      QC_ASSERT (targetAlign_aa % 3 == 0);
+      targetAlign_aa /= 3;
+	    
 	    const size_t stopCodonPos = targetSeq. find ('*');
 	    if (stopCodonPos != string::npos && stopCodonPos + 1 < targetSeq. size ())
 	      stopCodon = true;
@@ -211,37 +219,75 @@ struct BlastAlignment
                    bool verboseP) const 
     { if (! td. live ())
         return;
+      const string stxType_reported (stxS + (verboseP ? (subunit + stxType) : string (1, stxType [0])));
+      const string operon (frameshift 
+                             ? "FRAMESHIFT"
+                             : stopCodon 
+                               ? "INTERNAL_STOP"
+                               : truncated () || otherTruncated ()
+                                 ? "PARTIAL_CONTIG_END"
+                                 : verboseP && getRelCoverage () == 1.0
+                                   ? "COMPLETE_SUBUNIT"
+                                   : getExtended ()
+                                     ? "EXTENDED"
+                                     : "PARTIAL"
+                          );
+      const char strand (targetStrand ? '+' : '-');
+      const double refCoverage = getRelCoverage () * 100.0;
+      const double refIdentity = getIdentity ()    * 100.0; 
+      // td     
       if (! input_name. empty ())
   	    td << input_name;
-      td << targetName
-         << (stxS + (verboseP ? (subunit + stxType) : string (1, stxType [0])))
-         << (frameshift 
-              ? "FRAMESHIFT"
-              : stopCodon 
-                ? "INTERNAL_STOP"
-                : truncated () || otherTruncated ()
-                  ? "PARTIAL_CONTIG_END"
-                  : verboseP && getRelCoverage () == 1.0
-                    ? "COMPLETE_SUBUNIT"
-                    : getExtended ()
-                      ? "EXTENDED"
-                      : "PARTIAL"
-            )
-         << noString
-         << targetStart + 1
-         << targetEnd
-         << (targetStrand ? '+' : '-');
-      if (subunit == 'B')
-        td << noString
+      if (amrfinder)
+      {
+        const string subunitS (1, subunit);
+        string subclass (stxS + stxType);
+        strUpper (subclass);
+        td << na               // 1 "Protein identifier"  
+           << targetName       // 2 "Contig id"
+           << targetStart + 1  // 3 "Start"
+           << targetEnd        // 4 "Stop"
+           << strand           // 5 "Strand"
+           << stxType_reported // 6 "Gene symbol"
+           << "Shiga toxin"    // 7 "Sequence name"
+           << "plus"           // 8 "Scope"
+           << "VIRULENCE"      // 9 "Element type"
+           << "VIRULENCE"      //10 "Element subtype"
+           << subclass. substr (0, 4)   //11 "Class"
+           << subclass         //12 "Subclass"
+           << operon           //13 "Method"
+           << targetAlign_aa   //14 "Target length" 
+           << refLen           //15 "Reference sequence length"
+           << refCoverage      //16 "% Coverage of reference sequence"
+           << refIdentity      //17 "% Identity to reference sequence"
+           << length           //18 "Alignment length"
+           << refAccession     //19 "Accession of closest sequence"
+           << "Shiga toxin " + stxS + stxType + " subunit " + subunitS //20 "Name of closest sequence"
+           << na               //21 "HMM id"
+           << na               //22 "HMM description"
+           ;
+      }
+      else
+      {
+        td << targetName
+           << stxType_reported
+           << operon
            << noString
-           << noString;
-      td << refAccession
-         << getIdentity () * 100.0
-         << getRelCoverage () * 100.0;
-      if (subunit == 'A')
-        td << noString
-           << noString
-           << noString;
+           << targetStart + 1
+           << targetEnd
+           << strand;
+        if (subunit == 'B')
+          td << noString
+             << noString
+             << noString;
+        td << refAccession
+           << refIdentity
+           << refCoverage;
+        if (subunit == 'A')
+          td << noString
+             << noString
+             << noString;
+      }
       td. newLn ();
     }
     
@@ -260,6 +306,7 @@ struct BlastAlignment
         refEnd = prev. refEnd;
       length += prev. length;  // Approximately
       nident += prev. nident;  // Approximately
+      targetAlign_aa += prev. targetAlign_aa;
       if (prev. stopCodon)
         stopCodon = true;
       frameshift = true;
@@ -426,23 +473,65 @@ struct Operon
             if (stxType. size () == 2)
               stxType. erase (1);  
         }
+        const string targetName (al1->targetName);
+        const size_t start = al1->targetStart + 1;
+        const size_t stop  = al2->targetEnd;
+  	    const char strand (al1->targetStrand ? '+' : '-');
+  	    const string stxType_reported (stxS + stxType);
+  	    const double refIdentity = getIdentity () * 100.0;
+  	    // td
         if (! input_name. empty ())
   	      td << input_name;
-  	    td << al1->targetName
-           << (stxS + stxType)
-           << operonType
-           << getIdentity () * 100.0
-           << al1->targetStart + 1
-           << al2->targetEnd
-           << (al1->targetStrand ? '+' : '-')
-           // Approximately if frameshift
-           << getA () -> refAccession
-           << getA () -> getIdentity () * 100.0
-           << getA () -> getRelCoverage () * 100.0
-           << getB () -> refAccession
-           << getB () -> getIdentity () * 100.0
-           << getB () -> getRelCoverage () * 100.0
-           ;
+        if (amrfinder)
+        {
+          const string genesymbol (al1->stxType == al2->stxType ? stxS + al1->stxType : stxType_reported);
+          string subclass (genesymbol);
+          strUpper (subclass);
+          const size_t targetLen = al1->targetAlign_aa + al2->targetAlign_aa;
+          const size_t refLen = al1->refLen + al2->refLen;
+          const double refCoverage = double (al1->getAbsCoverage () + al2->getAbsCoverage ()) / double (refLen) * 100.0;
+          const size_t alignmentLen = al1->length + al2->length;
+          const string refAccessions (al1->refAccession + ", " + al2->refAccession);
+          td << na                // 1 "Protein identifier"  
+             << targetName        // 2 "Contig id"
+             << start             // 3 "Start"
+             << stop              // 4 "Stop"
+             << strand            // 5 "Strand"
+             << stxType_reported  // 6 "Gene symbol"
+             << "Shiga toxin"     // 7 "Sequence name"
+             << "plus"            // 8 "Scope"
+             << "VIRULENCE"       // 9 "Element type"
+             << "VIRULENCE"       //10 "Element subtype"
+             << subclass. substr (0, 4)   //11 "Class"
+             << subclass          //12 "Subclass"
+             << operonType        //13 "Method"
+             << targetLen         //14 "Target length" 
+             << refLen            //15 "Reference sequence length"
+             << refCoverage       //16 "% Coverage of reference sequence"
+             << refIdentity       //17 "% Identity to reference sequence"
+             << alignmentLen      //18 "Alignment length"
+             << refAccessions     //19 "Accession of closest sequence"
+             << "Shiga toxin " + genesymbol //20 "Name of closest sequence"
+             << na                //21 "HMM id"
+             << na                //22 "HMM description"
+             ;
+        }
+        else
+    	    td << targetName
+             << stxType_reported
+             << operonType
+             << refIdentity
+             << start
+             << stop
+             << strand
+             // Approximately if frameshift
+             << getA () -> refAccession
+             << getA () -> getIdentity () * 100.0
+             << getA () -> getRelCoverage () * 100.0
+             << getB () -> refAccession
+             << getB () -> getIdentity () * 100.0
+             << getB () -> getRelCoverage () * 100.0
+             ;
         td. newLn ();
       }
       else
@@ -635,6 +724,7 @@ struct ThisApplication : ShellApplication
       addKey ("name", "Text to be added as the first column \"name\" to all rows of the report, for example it can be an assembly name", "", '\0', "NAME");
       addKey ("output", "Write output to OUTPUT_FILE instead of STDOUT", "", 'o', "OUTPUT_FILE");
     	addKey ("blast_bin", "Directory for BLAST. Deafult: $BLAST_BIN", "", '\0', "BLAST_DIR");
+    	addFlag ("amrfinder", "Print output in the nucleotide AMRFinderPlus format");
 
       version = SVN_REV;
     }
@@ -648,6 +738,7 @@ struct ThisApplication : ShellApplication
                  input_name =             getArg ("name");
     const string output     =             getArg ("output");
           string blast_bin  =             getArg ("blast_bin");
+                 amrfinder  =             getFlag ("amrfinder");
     
     if (contains (input_name, '\t'))
       throw runtime_error ("NAME cannot contain a tab character");
@@ -755,20 +846,45 @@ struct ThisApplication : ShellApplication
     
     if (! input_name. empty ())
       td << "name";
-    td << "target_contig"
-       << "stx_type"
-       << "operon" 
-       << "identity"
-       << "target_start"
-       << "target_stop"
-       << "target_strand"
-       << "A_reference"
-       << "A_identity"
-       << "A_coverage"
-       << "B_reference"
-       << "B_identity"
-       << "B_coverage"
-       ; 
+    if (amrfinder)
+      td << /* 1*/ "Protein identifier"  
+         << /* 2*/ "Contig id"
+         << /* 3*/ "Start"
+         << /* 4*/ "Stop"
+         << /* 5*/ "Strand"
+         << /* 6*/ "Gene symbol"
+         << /* 7*/ "Sequence name"
+         << /* 8*/ "Scope"
+         << /* 9*/ "Element type"
+         << /*10*/ "Element subtype"
+         << /*11*/ "Class"
+         << /*12*/ "Subclass"
+         << /*13*/ "Method"
+         << /*14*/ "Target length"
+         << /*15*/ "Reference sequence length"
+         << /*16*/ "% Coverage of reference sequence"
+         << /*17*/ "% Identity to reference sequence"
+         << /*18*/ "Alignment length"
+         << /*19*/ "Accession of closest sequence"
+         << /*20*/ "Name of closest sequence"
+         << /*21*/ "HMM id"
+         << /*22*/ "HMM description"
+         ;
+    else
+      td << "target_contig"
+         << "stx_type"
+         << "operon" 
+         << "identity"
+         << "target_start"
+         << "target_stop"
+         << "target_strand"
+         << "A_reference"
+         << "A_identity"
+         << "A_coverage"
+         << "B_reference"
+         << "B_identity"
+         << "B_coverage"
+         ; 
     td. newLn ();
 
 	  VectorOwn<BlastAlignment> blastAls;   
