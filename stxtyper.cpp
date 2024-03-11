@@ -32,6 +32,7 @@
 * Dependencies: NCBI BLAST, gunzip (optional)
 *
 * Release changes:
+*   1.0.15 03/11/2024 PD-4924  dead stxA2j EFK5907329.1 is replaced by EMA1832120.1
 *   1.0.14 03/05/2024 PD-4918  --print_node: print AMRFinderPlus hierarchy node
 *   1.0.13 03/05/2024 PD-4910  --amrfinder prints output in the AMRFinderPlus format
 *   1.0.12 02/29/2024          TsvOut.live() is used
