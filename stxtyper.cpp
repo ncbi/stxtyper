@@ -32,7 +32,7 @@
 * Dependencies: NCBI BLAST, gunzip (optional)
 *
 * Release changes:
-*   1.0.16 03/13/2024 PD-4926  --amrfinder: <operon type>_operon, "Gene symbol" -> "Element symbol"
+*   1.0.16 03/13/2024 PD-4926  --amrfinder: <stx type>_operon, "Gene symbol" -> "Element symbol"
 *   1.0.15 03/11/2024 PD-4924  dead stxA2j EFK5907329.1 is replaced by EMA1832120.1
 *   1.0.14 03/05/2024 PD-4918  --print_node: print AMRFinderPlus hierarchy node
 *   1.0.13 03/05/2024 PD-4910  --amrfinder prints output in the AMRFinderPlus format
@@ -252,14 +252,14 @@ struct BlastAlignment
            << targetStart + 1  // 3 "Start"
            << targetEnd        // 4 "Stop"
            << strand           // 5 "Strand"
-           << stxType_reported // 6 "Gene symbol"
+           << stxType_reported  + "_operon" // 6 "Gene symbol"
            << "Shiga toxin"    // 7 "Sequence name"
            << "plus"           // 8 "Scope"
            << "VIRULENCE"      // 9 "Element type"
            << "VIRULENCE"      //10 "Element subtype"
            << subclass. substr (0, 4)   //11 "Class"
            << subclass         //12 "Subclass"
-           << operon + "_operon" //13 "Method"  // PD-4926
+           << operon           //13 "Method"  
            << targetAlign_aa   //14 "Target length" 
            << refLen           //15 "Reference sequence length"
            << refCoverage      //16 "% Coverage of reference sequence"
@@ -506,14 +506,14 @@ struct Operon
              << start             // 3 "Start"
              << stop              // 4 "Stop"
              << strand            // 5 "Strand"
-             << stxType_reported  // 6 "Gene symbol"
+             << stxType_reported + "_operon" // 6 "Gene symbol"
              << "Shiga toxin"     // 7 "Sequence name"
              << "plus"            // 8 "Scope"
              << "VIRULENCE"       // 9 "Element type"
              << "VIRULENCE"       //10 "Element subtype"
              << subclass. substr (0, 4)   //11 "Class"
              << subclass          //12 "Subclass"
-             << operonType + "_operon"  //13 "Method"  // PD-4926
+             << operonType        //13 "Method"  
              << targetLen         //14 "Target length" 
              << refLen            //15 "Reference sequence length"
              << refCoverage       //16 "% Coverage of reference sequence"
