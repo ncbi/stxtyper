@@ -32,6 +32,7 @@
 * Dependencies: NCBI BLAST, gunzip (optional)
 *
 * Release changes:
+*   1.0.16 03/13/2024 PD-4926  --amrfinder: <operon type>_operon, "Gene symbol" -> "Element symbol"
 *   1.0.15 03/11/2024 PD-4924  dead stxA2j EFK5907329.1 is replaced by EMA1832120.1
 *   1.0.14 03/05/2024 PD-4918  --print_node: print AMRFinderPlus hierarchy node
 *   1.0.13 03/05/2024 PD-4910  --amrfinder prints output in the AMRFinderPlus format
@@ -258,7 +259,7 @@ struct BlastAlignment
            << "VIRULENCE"      //10 "Element subtype"
            << subclass. substr (0, 4)   //11 "Class"
            << subclass         //12 "Subclass"
-           << operon           //13 "Method"
+           << operon + "_operon" //13 "Method"  // PD-4926
            << targetAlign_aa   //14 "Target length" 
            << refLen           //15 "Reference sequence length"
            << refCoverage      //16 "% Coverage of reference sequence"
@@ -512,7 +513,7 @@ struct Operon
              << "VIRULENCE"       //10 "Element subtype"
              << subclass. substr (0, 4)   //11 "Class"
              << subclass          //12 "Subclass"
-             << operonType        //13 "Method"
+             << operonType + "_operon"  //13 "Method"  // PD-4926
              << targetLen         //14 "Target length" 
              << refLen            //15 "Reference sequence length"
              << refCoverage       //16 "% Coverage of reference sequence"
@@ -867,7 +868,7 @@ struct ThisApplication : ShellApplication
          << /* 3*/ "Start"
          << /* 4*/ "Stop"
          << /* 5*/ "Strand"
-         << /* 6*/ "Gene symbol"
+         << /* 6*/ "Element symbol"  // PD-4924
          << /* 7*/ "Sequence name"
          << /* 8*/ "Scope"
          << /* 9*/ "Element type"
