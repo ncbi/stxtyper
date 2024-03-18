@@ -32,6 +32,22 @@
 * Dependencies: NCBI BLAST, gunzip (optional)
 *
 * Release changes:
+
+          Sequence name -> Element name in header
+          Sequence name, now Element name, should be type/subtype and include info when not complete e.g.,:
+              stx1a operon
+              stx2c operon
+              Partial stx2 operon
+              stx2 operon with frameshift
+              Novel stx2 operon
+              stx2 operon with internal stop
+          Element subtype should be STX_TYPE
+          Subclass should be to type only where element symbol is to type only
+              E.g. a partial stx2a should have Element symbol of stx2 and a subclass of STX2
+          Target length should be in nucleotide sequence coordinates
+          Reference sequence length and % coverage of reference sequence should be blank
+
+*   1.0.17 03/18/2024 PD-4910  
 *   1.0.16 03/13/2024 PD-4926  --amrfinder: <stx type>_operon, "Gene symbol" -> "Element symbol"
 *   1.0.15 03/11/2024 PD-4924  dead stxA2j EFK5907329.1 is replaced by EMA1832120.1
 *   1.0.14 03/05/2024 PD-4918  --print_node: print AMRFinderPlus hierarchy node
@@ -94,6 +110,26 @@ const string na ("na");
 
 
 
+string stxType_reported_operon2elementSymbol (const string &stxType_reported,
+                                              const string &operon)
+{
+  string elementSymbol (stxType_reported  + " operon");
+       if (operon == "FRAMESHIFT")
+    elementSymbol += " with frameshift";
+  else if (operon == "INTERNAL_STOP")
+    elementSymbol += " with internal stop";
+  else if (contains (operon, "PARTIAL"))
+    elementSymbol = "Partial " + elementSymbol;
+  else if (operon == "EXTENDED")
+    elementSymbol = "Extended " + elementSymbol;
+  else if (contains (operon, "NOVEL"))
+    elementSymbol = "Novel " + elementSymbol;
+    
+  return elementSymbol;
+}
+
+
+
 struct BlastAlignment 
 {
   size_t length {0}, nident {0}  // aa
@@ -109,7 +145,8 @@ struct BlastAlignment
   string targetSeq;  
   bool targetStrand {true}; 
     // false <=> negative
-  size_t targetAlign_aa {0};
+  size_t targetAlign {0};
+    // bp
   
   // Reference
   // Whole sequence ends with '*'
@@ -184,9 +221,9 @@ struct BlastAlignment
 	    refStart--;
 	    targetStart--;
 	    
-      targetAlign_aa = targetEnd - targetStart;
-      QC_ASSERT (targetAlign_aa % 3 == 0);
-      targetAlign_aa /= 3;
+      targetAlign = targetEnd - targetStart;
+    //QC_ASSERT (targetAlign_aa % 3 == 0);
+    //targetAlign_aa /= 3;
 	    
 	    const size_t stopCodonPos = targetSeq. find ('*');
 	    if (stopCodonPos != string::npos && stopCodonPos + 1 < targetSeq. size ())
@@ -245,24 +282,24 @@ struct BlastAlignment
       if (amrfinder)
       {
         const string subunitS (1, subunit);
-        string subclass (stxS + stxType);
+        string subclass (stxType_reported /*stxS + stxType*/);
         strUpper (subclass);
         td << na               // 1 "Protein identifier"  
            << targetName       // 2 "Contig id"
            << targetStart + 1  // 3 "Start"
            << targetEnd        // 4 "Stop"
            << strand           // 5 "Strand"
-           << stxType_reported  + "_operon" // 6 "Gene symbol"
+           << stxType_reported_operon2elementSymbol (stxType_reported, operon)    // 6 "Element symbol"
            << "Shiga toxin"    // 7 "Sequence name"
            << "plus"           // 8 "Scope"
            << "VIRULENCE"      // 9 "Element type"
-           << "VIRULENCE"      //10 "Element subtype"
+           << "STX_TYPE"       //10 "Element subtype"
            << subclass. substr (0, 4)   //11 "Class"
            << subclass         //12 "Subclass"
            << operon           //13 "Method"  
-           << targetAlign_aa   //14 "Target length" 
-           << refLen           //15 "Reference sequence length"
-           << refCoverage      //16 "% Coverage of reference sequence"
+           << targetAlign      //14 "Target length" 
+           << noString /*refLen*/  //15 "Reference sequence length"
+           << noString /*refCoverage*/      //16 "% Coverage of reference sequence"
            << refIdentity      //17 "% Identity to reference sequence"
            << length           //18 "Alignment length"
            << refAccession     //19 "Accession of closest sequence"
@@ -314,7 +351,7 @@ struct BlastAlignment
         refEnd = prev. refEnd;
       length += prev. length;  // Approximately
       nident += prev. nident;  // Approximately
-      targetAlign_aa += prev. targetAlign_aa;
+      targetAlign += prev. targetAlign;
       if (prev. stopCodon)
         stopCodon = true;
       frameshift = true;
@@ -493,11 +530,11 @@ struct Operon
         if (amrfinder)
         {
           const string genesymbol (al1->stxType == al2->stxType ? stxS + al1->stxType : stxType_reported);
-          string subclass (genesymbol);
+          string subclass (stxType_reported /*genesymbol*/);
           strUpper (subclass);
-          const size_t targetLen = al1->targetAlign_aa + al2->targetAlign_aa;
-          const size_t refLen = al1->refLen + al2->refLen;
-          const double refCoverage = double (al1->getAbsCoverage () + al2->getAbsCoverage ()) / double (refLen) * 100.0;
+          const size_t targetAlign = al2->targetEnd - al1->targetStart;
+        //const size_t refLen = al1->refLen + al2->refLen;
+        //const double refCoverage = double (al1->getAbsCoverage () + al2->getAbsCoverage ()) / double (refLen) * 100.0;
           const size_t alignmentLen = al1->length + al2->length;
           const string refAccessions (al1->refAccession + ", " + al2->refAccession);
           const string fam (al1->getGenesymbol () + ", " + al2->getGenesymbol ());
@@ -506,17 +543,17 @@ struct Operon
              << start             // 3 "Start"
              << stop              // 4 "Stop"
              << strand            // 5 "Strand"
-             << stxType_reported + "_operon" // 6 "Gene symbol"
+             << stxType_reported_operon2elementSymbol (stxType_reported, operonType)    // 6 "Element symbol"
              << "Shiga toxin"     // 7 "Sequence name"
              << "plus"            // 8 "Scope"
              << "VIRULENCE"       // 9 "Element type"
-             << "VIRULENCE"       //10 "Element subtype"
+             << "STX_TYPE"        //10 "Element subtype"
              << subclass. substr (0, 4)   //11 "Class"
              << subclass          //12 "Subclass"
              << operonType        //13 "Method"  
-             << targetLen         //14 "Target length" 
-             << refLen            //15 "Reference sequence length"
-             << refCoverage       //16 "% Coverage of reference sequence"
+             << targetAlign       //14 "Target length" 
+             << noString /*refLen*/  //15 "Reference sequence length"
+             << noString /*refCoverage*/  //16 "% Coverage of reference sequence"
              << refIdentity       //17 "% Identity to reference sequence"
              << alignmentLen      //18 "Alignment length"
              << refAccessions     //19 "Accession of closest sequence"
@@ -869,7 +906,7 @@ struct ThisApplication : ShellApplication
          << /* 4*/ "Stop"
          << /* 5*/ "Strand"
          << /* 6*/ "Element symbol"  // PD-4924
-         << /* 7*/ "Sequence name"
+         << /* 7*/ "Element name"  // PD-4910
          << /* 8*/ "Scope"
          << /* 9*/ "Element type"
          << /*10*/ "Element subtype"
