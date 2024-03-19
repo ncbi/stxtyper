@@ -32,6 +32,7 @@
 * Dependencies: NCBI BLAST, gunzip (optional)
 *
 * Release changes:
+*  1.0.18 03/19/2024 PD-4910  Element symbol is <stx type>_operon, Element name is as below
 
           Sequence name -> Element name in header
           Sequence name, now Element name, should be type/subtype and include info when not complete e.g.,:
@@ -110,22 +111,22 @@ const string na ("na");
 
 
 
-string stxType_reported_operon2elementSymbol (const string &stxType_reported,
-                                              const string &operon)
+string stxType_reported_operon2elementName (const string &stxType_reported,
+                                            const string &operon)
 {
-  string elementSymbol (stxType_reported  + " operon");
+  string elementName (stxType_reported  + " operon");
        if (operon == "FRAMESHIFT")
-    elementSymbol += " with frameshift";
+    elementName += " with frameshift";
   else if (operon == "INTERNAL_STOP")
-    elementSymbol += " with internal stop";
+    elementName += " with internal stop";
   else if (contains (operon, "PARTIAL"))
-    elementSymbol = "Partial " + elementSymbol;
+    elementName = "Partial " + elementName;
   else if (operon == "EXTENDED")
-    elementSymbol = "Extended " + elementSymbol;
+    elementName = "Extended " + elementName;
   else if (contains (operon, "NOVEL"))
-    elementSymbol = "Novel " + elementSymbol;
+    elementName = "Novel " + elementName;
     
-  return elementSymbol;
+  return elementName;
 }
 
 
@@ -289,8 +290,8 @@ struct BlastAlignment
            << targetStart + 1  // 3 "Start"
            << targetEnd        // 4 "Stop"
            << strand           // 5 "Strand"
-           << stxType_reported_operon2elementSymbol (stxType_reported, operon)    // 6 "Element symbol"
-           << "Shiga toxin"    // 7 "Sequence name"
+           << stxType_reported + "_operon" // 6 "Element symbol"
+           << stxType_reported_operon2elementName (stxType_reported, operon)    // 7 "Element name"
            << "plus"           // 8 "Scope"
            << "VIRULENCE"      // 9 "Element type"
            << "STX_TYPE"       //10 "Element subtype"
@@ -543,8 +544,8 @@ struct Operon
              << start             // 3 "Start"
              << stop              // 4 "Stop"
              << strand            // 5 "Strand"
-             << stxType_reported_operon2elementSymbol (stxType_reported, operonType)    // 6 "Element symbol"
-             << "Shiga toxin"     // 7 "Sequence name"
+             << stxType_reported + "_operon"  // 6 "Element symbol"
+             << stxType_reported_operon2elementName (stxType_reported, operonType)    // 7 "Element name"
              << "plus"            // 8 "Scope"
              << "VIRULENCE"       // 9 "Element type"
              << "STX_TYPE"        //10 "Element subtype"
