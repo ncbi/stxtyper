@@ -32,7 +32,8 @@
 * Dependencies: NCBI BLAST, gunzip (optional)
 *
 * Release changes:
-*  1.0.18 03/19/2024 PD-4910  Element symbol is <stx type>_operon, Element name is as below
+*  1.0.19 03/26/2024          BlastAlignment::targetAlign is removed
+*  1.0.18 03/19/2024 PD-4910  Element symbol is <stx type>_operon, Element name contains operon quality attribute"
 
           Sequence name -> Element name in header
           Sequence name, now Element name, should be type/subtype and include info when not complete e.g.,:
@@ -146,7 +147,7 @@ struct BlastAlignment
   string targetSeq;  
   bool targetStrand {true}; 
     // false <=> negative
-  size_t targetAlign {0};
+//size_t targetAlign {0};
     // bp
   
   // Reference
@@ -222,7 +223,7 @@ struct BlastAlignment
 	    refStart--;
 	    targetStart--;
 	    
-      targetAlign = targetEnd - targetStart;
+    //targetAlign = targetEnd - targetStart;
     //QC_ASSERT (targetAlign_aa % 3 == 0);
     //targetAlign_aa /= 3;
 	    
@@ -298,7 +299,7 @@ struct BlastAlignment
            << subclass. substr (0, 4)   //11 "Class"
            << subclass         //12 "Subclass"
            << operon           //13 "Method"  
-           << targetAlign      //14 "Target length" 
+           << targetEnd - targetStart /*targetAlign*/      //14 "Target length" 
            << noString /*refLen*/  //15 "Reference sequence length"
            << noString /*refCoverage*/      //16 "% Coverage of reference sequence"
            << refIdentity      //17 "% Identity to reference sequence"
@@ -352,7 +353,7 @@ struct BlastAlignment
         refEnd = prev. refEnd;
       length += prev. length;  // Approximately
       nident += prev. nident;  // Approximately
-      targetAlign += prev. targetAlign;
+    //targetAlign += prev. targetAlign;
       if (prev. stopCodon)
         stopCodon = true;
       frameshift = true;
@@ -377,7 +378,9 @@ struct BlastAlignment
              || (targetStrand == (subunit == 'A') && targetLen - targetEnd <= missed_max);
     }
   bool getExtended () const
-    { return ! refStart && refEnd + 1 == refLen; }
+    { ASSERT (! truncated ());
+      return ! refStart && refEnd + 1 == refLen; 
+    }
   bool insideEq (const BlastAlignment &other) const
     { return    targetStart >= other. targetStart 
              && targetEnd   <= other. targetEnd;
