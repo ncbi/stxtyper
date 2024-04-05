@@ -32,6 +32,8 @@
 * Dependencies: NCBI BLAST, gunzip (optional)
 *
 * Release changes:
+*  1.0.19 03/26/2024          BlastAlignment::targetAlign is removed
+*  1.0.18 03/19/2024 PD-4910  Element symbol is <stx type>_operon, Element name contains operon quality attribute"
 
           Sequence name -> Element name in header
           Sequence name, now Element name, should be type/subtype and include info when not complete e.g.,:
@@ -110,22 +112,22 @@ const string na ("na");
 
 
 
-string stxType_reported_operon2elementSymbol (const string &stxType_reported,
-                                              const string &operon)
+string stxType_reported_operon2elementName (const string &stxType_reported,
+                                            const string &operon)
 {
-  string elementSymbol (stxType_reported  + " operon");
+  string elementName (stxType_reported  + " operon");
        if (operon == "FRAMESHIFT")
-    elementSymbol += " with frameshift";
+    elementName += " with frameshift";
   else if (operon == "INTERNAL_STOP")
-    elementSymbol += " with internal stop";
+    elementName += " with internal stop";
   else if (contains (operon, "PARTIAL"))
-    elementSymbol = "Partial " + elementSymbol;
+    elementName = "Partial " + elementName;
   else if (operon == "EXTENDED")
-    elementSymbol = "Extended " + elementSymbol;
+    elementName = "Extended " + elementName;
   else if (contains (operon, "NOVEL"))
-    elementSymbol = "Novel " + elementSymbol;
+    elementName = "Novel " + elementName;
     
-  return elementSymbol;
+  return elementName;
 }
 
 
@@ -145,7 +147,7 @@ struct BlastAlignment
   string targetSeq;  
   bool targetStrand {true}; 
     // false <=> negative
-  size_t targetAlign {0};
+//size_t targetAlign {0};
     // bp
   
   // Reference
@@ -221,7 +223,7 @@ struct BlastAlignment
 	    refStart--;
 	    targetStart--;
 	    
-      targetAlign = targetEnd - targetStart;
+    //targetAlign = targetEnd - targetStart;
     //QC_ASSERT (targetAlign_aa % 3 == 0);
     //targetAlign_aa /= 3;
 	    
@@ -289,15 +291,15 @@ struct BlastAlignment
            << targetStart + 1  // 3 "Start"
            << targetEnd        // 4 "Stop"
            << strand           // 5 "Strand"
-           << stxType_reported_operon2elementSymbol (stxType_reported, operon)    // 6 "Element symbol"
-           << "Shiga toxin"    // 7 "Sequence name"
+           << stxType_reported + "_operon" // 6 "Element symbol"
+           << stxType_reported_operon2elementName (stxType_reported, operon)    // 7 "Element name"
            << "plus"           // 8 "Scope"
            << "VIRULENCE"      // 9 "Element type"
            << "STX_TYPE"       //10 "Element subtype"
            << subclass. substr (0, 4)   //11 "Class"
            << subclass         //12 "Subclass"
            << operon           //13 "Method"  
-           << targetAlign      //14 "Target length" 
+           << targetEnd - targetStart /*targetAlign*/      //14 "Target length" 
            << noString /*refLen*/  //15 "Reference sequence length"
            << noString /*refCoverage*/      //16 "% Coverage of reference sequence"
            << refIdentity      //17 "% Identity to reference sequence"
@@ -351,7 +353,7 @@ struct BlastAlignment
         refEnd = prev. refEnd;
       length += prev. length;  // Approximately
       nident += prev. nident;  // Approximately
-      targetAlign += prev. targetAlign;
+    //targetAlign += prev. targetAlign;
       if (prev. stopCodon)
         stopCodon = true;
       frameshift = true;
@@ -376,7 +378,9 @@ struct BlastAlignment
              || (targetStrand == (subunit == 'A') && targetLen - targetEnd <= missed_max);
     }
   bool getExtended () const
-    { return ! refStart && refEnd + 1 == refLen; }
+    { ASSERT (! truncated ());
+      return ! refStart && refEnd + 1 == refLen; 
+    }
   bool insideEq (const BlastAlignment &other) const
     { return    targetStart >= other. targetStart 
              && targetEnd   <= other. targetEnd;
@@ -543,8 +547,8 @@ struct Operon
              << start             // 3 "Start"
              << stop              // 4 "Stop"
              << strand            // 5 "Strand"
-             << stxType_reported_operon2elementSymbol (stxType_reported, operonType)    // 6 "Element symbol"
-             << "Shiga toxin"     // 7 "Sequence name"
+             << stxType_reported + "_operon"  // 6 "Element symbol"
+             << stxType_reported_operon2elementName (stxType_reported, operonType)    // 7 "Element name"
              << "plus"            // 8 "Scope"
              << "VIRULENCE"       // 9 "Element type"
              << "STX_TYPE"        //10 "Element subtype"

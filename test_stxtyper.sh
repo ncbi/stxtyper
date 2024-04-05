@@ -11,25 +11,33 @@ else
     STXTYPER=./stxtyper
 fi
 
+# globals updated by function test_input_file
 FAILURES=0
-TESTS=4
+TESTS=0
+TEST_TEXT=''
 
 function test_input_file {
-    local test_base=$1
-    if ! $STXTYPER -n "test/$test_base.fa" > "test/$test_base.got"
+    local test_base="$1"
+    local options="$2"
+
+    TESTS=$(( $TESTS + 1 ))
+
+    if ! $STXTYPER $options -n "test/$test_base.fa" > "test/$test_base.got"
     then
         echo "not ok: $STXTYPER returned a non-zero exit value indicating a failure of the software"
-        echo "#  $STXTYPER -n test/$test_base.fa > test/$test_base.got"
+        echo "#  $STXTYPER $options -n test/$test_base.fa > test/$test_base.got"
+        TEST_TEXT="$TEST_TEXT"$'\n'"Failed $test_base"
         return 1
     else
         if ! diff -q "test/$test_base.expected" "test/$test_base.got"
         then
             echo "not ok: $STXTYPER returned output different from expected"
-            echo "#  $STXTYPER -n test/$test_base.fa > test/$test_base.got"
+            echo "#  $STXTYPER $options -n test/$test_base.fa > test/$test_base.got"
             echo "# diff test/$test_base.expected test/$test_base.got"
             diff "test/$test_base.expected" "test/$test_base.got"
             echo "#  To approve run:"
             echo "#     mv test/$test_base.got test/$test_base.expected "
+            TEST_TEXT="$TEST_TEXT"$'\n'"Failed $test_base"
             return 1
         else
             echo "ok: test/$test_base.fa"
@@ -76,7 +84,14 @@ FAILURES=$(( $? + $FAILURES ))
 test_input_file 'cases'
 FAILURES=$(( $? + $FAILURES ))
 
+test_input_file 'amrfinder_integration' '--amrfinder'
+FAILURES=$(( $? + $FAILURES ))
+
+test_input_file 'amrfinder_integration2' '--amrfinder --print_node' 
+FAILURES=$(( $? + $FAILURES ))
+
 echo "Done."
+echo "$TEST_TEXT"
 echo ""
 if [ "$FAILURES" -gt 0 ]
 then
