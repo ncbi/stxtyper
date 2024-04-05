@@ -38,6 +38,32 @@ function test_input_file {
     fi
 }
 
+function test_amrfinder_output {
+    local test_base=$1
+    if ! $STXTYPER --amrfinder -n "test/$test_base.fa" > "test/$test_base.amr.got"
+    then
+        echo "not ok: $STXTYPER returned a non-zero exit value indicating a failure of the software"
+        echo "#  $STXTYPER -n test/$test_base.fa > test/$test_base.amr.got"
+        return 1
+    else
+        if ! diff -q "test/$test_base.amr.expected" "test/$test_base.amr.got"
+            ###### STOPPED HERE ######
+        then
+            echo "not ok: $STXTYPER returned output different from expected"
+            echo "#  $STXTYPER -n test/$test_base.fa > test/$test_base.got"
+            echo "# diff test/$test_base.expected test/$test_base.got"
+            diff "test/$test_base.expected" "test/$test_base.got"
+            echo "#  To approve run:"
+            echo "#     mv test/$test_base.got test/$test_base.expected "
+            return 1
+        else
+            echo "ok: test/$test_base.fa"
+            return 0
+        fi
+    fi
+}
+
+
 test_input_file 'basic'
 FAILURES=$(( $? + $FAILURES ))
 
