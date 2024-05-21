@@ -32,6 +32,7 @@
 * Dependencies: NCBI BLAST, gunzip (optional)
 *
 * Release changes:
+*  1.0.20 05/21/2024 PD-5002  {A|B}_reference_subtype
 *  1.0.19 03/26/2024          BlastAlignment::targetAlign is removed
 *  1.0.18 03/19/2024 PD-4910  Element symbol is <stx type>_operon, Element name contains operon quality attribute"
 
@@ -162,6 +163,7 @@ struct BlastAlignment
     // Function of stxClass
   char subunit {'\0'};
     // 'A' or 'B'
+  string subClass;  // = as in AMRFinderPlus report
   
   bool reported {false};
 
@@ -181,6 +183,7 @@ struct BlastAlignment
   	    string famId;
         try
         {	
+  		    subClass     = rfindSplit (sseqid, '|');  
   		    famId        = rfindSplit (sseqid, '|');  
   		    refAccession = rfindSplit (sseqid, '|');
   		  }
@@ -251,6 +254,7 @@ struct BlastAlignment
       QC_ASSERT (contains (stxClass2identity, stxClass));
       QC_ASSERT (isLeft (stxType, stxClass));
       QC_ASSERT (subunit == 'A' || subunit == 'B');
+      QC_ASSERT (subClass. size () > stxS. size ());
       QC_ASSERT (! refAccession. empty ());
       QC_ASSERT (! targetSeq. empty ());
       QC_ASSERT (! refSeq. empty ());
@@ -324,12 +328,15 @@ struct BlastAlignment
         if (subunit == 'B')
           td << noString
              << noString
+             << noString
              << noString;
         td << refAccession
+           << subClass
            << refIdentity
            << refCoverage;
         if (subunit == 'A')
           td << noString
+             << noString
              << noString
              << noString;
       }
@@ -578,9 +585,11 @@ struct Operon
              << strand
              // Approximately if frameshift
              << getA () -> refAccession
+             << getA () -> subClass
              << getA () -> getIdentity () * 100.0
              << getA () -> getRelCoverage () * 100.0
              << getB () -> refAccession
+             << getB () -> subClass
              << getB () -> getIdentity () * 100.0
              << getB () -> getRelCoverage () * 100.0
              ;
@@ -939,9 +948,11 @@ struct ThisApplication : ShellApplication
          << "target_stop"
          << "target_strand"
          << "A_reference"
+         << "A_reference_subtype"
          << "A_identity"
          << "A_coverage"
          << "B_reference"
+         << "B_reference_subtype"
          << "B_identity"
          << "B_coverage"
          ; 
