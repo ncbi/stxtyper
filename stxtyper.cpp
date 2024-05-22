@@ -32,6 +32,31 @@
 * Dependencies: NCBI BLAST, gunzip (optional)
 *
 * Release changes:
+*  1.0.20 05/21/2024 PD-5002  {A|B}_reference_subtype
+*  1.0.19 03/26/2024          BlastAlignment::targetAlign is removed
+*  1.0.18 03/19/2024 PD-4910  Element symbol is <stx type>_operon, Element name contains operon quality attribute"
+
+          Sequence name -> Element name in header
+          Sequence name, now Element name, should be type/subtype and include info when not complete e.g.,:
+              stx1a operon
+              stx2c operon
+              Partial stx2 operon
+              stx2 operon with frameshift
+              Novel stx2 operon
+              stx2 operon with internal stop
+          Element subtype should be STX_TYPE
+          Subclass should be to type only where element symbol is to type only
+              E.g. a partial stx2a should have Element symbol of stx2 and a subclass of STX2
+          Target length should be in nucleotide sequence coordinates
+          Reference sequence length and % coverage of reference sequence should be blank
+
+*   1.0.17 03/18/2024 PD-4910  
+*   1.0.16 03/13/2024 PD-4926  --amrfinder: <stx type>_operon, "Gene symbol" -> "Element symbol"
+*   1.0.15 03/11/2024 PD-4924  dead stxA2j EFK5907329.1 is replaced by EMA1832120.1
+*   1.0.14 03/05/2024 PD-4918  --print_node: print AMRFinderPlus hierarchy node
+*   1.0.13 03/05/2024 PD-4910  --amrfinder prints output in the AMRFinderPlus format
+*   1.0.12 02/29/2024          TsvOut.live() is used
+*   1.0.11 02/28/2024 PD-4911  wrong QC for log file output
 *                     PD-4897  single-subunit operons are de-redundified
 *   1.0.10 02/22/2024 PD-4901  multiple types for the same protein sequence are allowed; only Flemming's reference proteins are used
 *   1.0.9  02/16/2024 PD-4901  new database (includes Flemming's data)
@@ -75,6 +100,8 @@ namespace
 
 
 string input_name;
+bool amrfinder = false;
+bool print_node = false;
 map<string,double> stxClass2identity;
 
 // PAR
@@ -82,6 +109,27 @@ constexpr size_t intergenic_max {36};  // Max. intergenic region in the referenc
 constexpr size_t slack = 30;  
 
 const string stxS ("stx");
+const string na ("na");
+
+
+
+string stxType_reported_operon2elementName (const string &stxType_reported,
+                                            const string &operon)
+{
+  string elementName (stxType_reported  + " operon");
+       if (operon == "FRAMESHIFT")
+    elementName += " with frameshift";
+  else if (operon == "INTERNAL_STOP")
+    elementName += " with internal stop";
+  else if (contains (operon, "PARTIAL"))
+    elementName = "Partial " + elementName;
+  else if (operon == "EXTENDED")
+    elementName = "Extended " + elementName;
+  else if (contains (operon, "NOVEL"))
+    elementName = "Novel " + elementName;
+    
+  return elementName;
+}
 
 
 
@@ -100,6 +148,8 @@ struct BlastAlignment
   string targetSeq;  
   bool targetStrand {true}; 
     // false <=> negative
+//size_t targetAlign {0};
+    // bp
   
   // Reference
   // Whole sequence ends with '*'
@@ -113,6 +163,7 @@ struct BlastAlignment
     // Function of stxClass
   char subunit {'\0'};
     // 'A' or 'B'
+  string subClass;  // = as in AMRFinderPlus report
   
   bool reported {false};
 
@@ -132,6 +183,7 @@ struct BlastAlignment
   	    string famId;
         try
         {	
+  		    subClass     = rfindSplit (sseqid, '|');  
   		    famId        = rfindSplit (sseqid, '|');  
   		    refAccession = rfindSplit (sseqid, '|');
   		  }
@@ -174,6 +226,10 @@ struct BlastAlignment
 	    refStart--;
 	    targetStart--;
 	    
+    //targetAlign = targetEnd - targetStart;
+    //QC_ASSERT (targetAlign_aa % 3 == 0);
+    //targetAlign_aa /= 3;
+	    
 	    const size_t stopCodonPos = targetSeq. find ('*');
 	    if (stopCodonPos != string::npos && stopCodonPos + 1 < targetSeq. size ())
 	      stopCodon = true;
@@ -198,6 +254,7 @@ struct BlastAlignment
       QC_ASSERT (contains (stxClass2identity, stxClass));
       QC_ASSERT (isLeft (stxType, stxClass));
       QC_ASSERT (subunit == 'A' || subunit == 'B');
+      QC_ASSERT (subClass. size () > stxS. size ());
       QC_ASSERT (! refAccession. empty ());
       QC_ASSERT (! targetSeq. empty ());
       QC_ASSERT (! refSeq. empty ());
@@ -207,41 +264,88 @@ struct BlastAlignment
     }
   void saveTsvOut (TsvOut& td,
                    bool verboseP) const 
-    { if (! input_name. empty ())
+    { if (! td. live ())
+        return;
+      const string stxType_reported (verboseP ? getGenesymbol () : (stxS + stxType. substr (0, 1)));
+      const string operon (frameshift 
+                             ? "FRAMESHIFT"
+                             : stopCodon 
+                               ? "INTERNAL_STOP"
+                               : truncated () || otherTruncated ()
+                                 ? "PARTIAL_CONTIG_END"
+                                 : verboseP && getRelCoverage () == 1.0
+                                   ? "COMPLETE_SUBUNIT"
+                                   : getExtended ()
+                                     ? "EXTENDED"
+                                     : "PARTIAL"
+                          );
+      const char strand (targetStrand ? '+' : '-');
+      const double refCoverage = getRelCoverage () * 100.0;
+      const double refIdentity = getIdentity ()    * 100.0; 
+      // td     
+      if (! input_name. empty ())
   	    td << input_name;
-      td << targetName
-         << (stxS + (verboseP ? (subunit + stxType) : string (1, stxType [0])))
-         << (frameshift 
-              ? "FRAMESHIFT"
-              : stopCodon 
-                ? "INTERNAL_STOP"
-                : truncated () || otherTruncated ()
-                  ? "PARTIAL_CONTIG_END"
-                  : verboseP && getRelCoverage () == 1.0
-                    ? "COMPLETE_SUBUNIT"
-                    : getExtended ()
-                      ? "EXTENDED"
-                      : "PARTIAL"
-            )
-         << noString
-         << targetStart + 1
-         << targetEnd
-         << (targetStrand ? '+' : '-');
-      if (subunit == 'B')
-        td << noString
+      if (amrfinder)
+      {
+        const string subunitS (1, subunit);
+        string subclass (stxType_reported /*stxS + stxType*/);
+        strUpper (subclass);
+        td << na               // 1 "Protein identifier"  
+           << targetName       // 2 "Contig id"
+           << targetStart + 1  // 3 "Start"
+           << targetEnd        // 4 "Stop"
+           << strand           // 5 "Strand"
+           << stxType_reported + "_operon" // 6 "Element symbol"
+           << stxType_reported_operon2elementName (stxType_reported, operon)    // 7 "Element name"
+           << "plus"           // 8 "Scope"
+           << "VIRULENCE"      // 9 "Element type"
+           << "STX_TYPE"       //10 "Element subtype"
+           << subclass. substr (0, 4)   //11 "Class"
+           << subclass         //12 "Subclass"
+           << operon           //13 "Method"  
+           << targetEnd - targetStart /*targetAlign*/      //14 "Target length" 
+           << noString /*refLen*/  //15 "Reference sequence length"
+           << noString /*refCoverage*/      //16 "% Coverage of reference sequence"
+           << refIdentity      //17 "% Identity to reference sequence"
+           << length           //18 "Alignment length"
+           << refAccession     //19 "Accession of closest sequence"
+           << "Shiga toxin " + stxS + stxType + " subunit " + subunitS //20 "Name of closest sequence"
+           << na               //21 "HMM id"
+           << na               //22 "HMM description"
+           ;
+        if (print_node)
+          td << getGenesymbol ();
+      }
+      else
+      {
+        td << targetName
+           << stxType_reported
+           << operon
            << noString
-           << noString;
-      td << refAccession
-         << getIdentity () * 100.0
-         << getRelCoverage () * 100.0;
-      if (subunit == 'A')
-        td << noString
-           << noString
-           << noString;
+           << targetStart + 1
+           << targetEnd
+           << strand;
+        if (subunit == 'B')
+          td << noString
+             << noString
+             << noString
+             << noString;
+        td << refAccession
+           << subClass
+           << refIdentity
+           << refCoverage;
+        if (subunit == 'A')
+          td << noString
+             << noString
+             << noString
+             << noString;
+      }
       td. newLn ();
     }
     
 
+  string getGenesymbol () const
+    { return stxS + subunit + stxType; }
   void merge (const BlastAlignment &prev)
     { ASSERT (targetName   == prev. targetName);
       ASSERT (refAccession == prev. refAccession);
@@ -256,6 +360,7 @@ struct BlastAlignment
         refEnd = prev. refEnd;
       length += prev. length;  // Approximately
       nident += prev. nident;  // Approximately
+    //targetAlign += prev. targetAlign;
       if (prev. stopCodon)
         stopCodon = true;
       frameshift = true;
@@ -280,7 +385,9 @@ struct BlastAlignment
              || (targetStrand == (subunit == 'A') && targetLen - targetEnd <= missed_max);
     }
   bool getExtended () const
-    { return ! refStart && refEnd + 1 == refLen; }
+    { ASSERT (! truncated ());
+      return ! refStart && refEnd + 1 == refLen; 
+    }
   bool insideEq (const BlastAlignment &other) const
     { return    targetStart >= other. targetStart 
              && targetEnd   <= other. targetEnd;
@@ -387,6 +494,8 @@ struct Operon
   void saveTsvOut (TsvOut& td,
                    bool verboseP) const 
     { ASSERT (al1);
+      if (! td. live ())
+        return;
       if (al2)
       {
         string stxType (getStxType (verboseP));
@@ -420,23 +529,70 @@ struct Operon
             if (stxType. size () == 2)
               stxType. erase (1);  
         }
+        const string targetName (al1->targetName);
+        const size_t start = al1->targetStart + 1;
+        const size_t stop  = al2->targetEnd;
+  	    const char strand (al1->targetStrand ? '+' : '-');
+  	    const string stxType_reported (stxS + stxType);
+  	    const double refIdentity = getIdentity () * 100.0;
+  	    // td
         if (! input_name. empty ())
   	      td << input_name;
-  	    td << al1->targetName
-           << (stxS + stxType)
-           << operonType
-           << getIdentity () * 100.0
-           << al1->targetStart + 1
-           << al2->targetEnd
-           << (al1->targetStrand ? '+' : '-')
-           // Approximately if frameshift
-           << getA () -> refAccession
-           << getA () -> getIdentity () * 100.0
-           << getA () -> getRelCoverage () * 100.0
-           << getB () -> refAccession
-           << getB () -> getIdentity () * 100.0
-           << getB () -> getRelCoverage () * 100.0
-           ;
+        if (amrfinder)
+        {
+          const string genesymbol (al1->stxType == al2->stxType ? stxS + al1->stxType : stxType_reported);
+          string subclass (stxType_reported /*genesymbol*/);
+          strUpper (subclass);
+          const size_t targetAlign = al2->targetEnd - al1->targetStart;
+        //const size_t refLen = al1->refLen + al2->refLen;
+        //const double refCoverage = double (al1->getAbsCoverage () + al2->getAbsCoverage ()) / double (refLen) * 100.0;
+          const size_t alignmentLen = al1->length + al2->length;
+          const string refAccessions (al1->refAccession + ", " + al2->refAccession);
+          const string fam (al1->getGenesymbol () + ", " + al2->getGenesymbol ());
+          td << na                // 1 "Protein identifier"  
+             << targetName        // 2 "Contig id"
+             << start             // 3 "Start"
+             << stop              // 4 "Stop"
+             << strand            // 5 "Strand"
+             << stxType_reported + "_operon"  // 6 "Element symbol"
+             << stxType_reported_operon2elementName (stxType_reported, operonType)    // 7 "Element name"
+             << "plus"            // 8 "Scope"
+             << "VIRULENCE"       // 9 "Element type"
+             << "STX_TYPE"        //10 "Element subtype"
+             << subclass. substr (0, 4)   //11 "Class"
+             << subclass          //12 "Subclass"
+             << operonType        //13 "Method"  
+             << targetAlign       //14 "Target length" 
+             << noString /*refLen*/  //15 "Reference sequence length"
+             << noString /*refCoverage*/  //16 "% Coverage of reference sequence"
+             << refIdentity       //17 "% Identity to reference sequence"
+             << alignmentLen      //18 "Alignment length"
+             << refAccessions     //19 "Accession of closest sequence"
+             << "Shiga toxin " + genesymbol //20 "Name of closest sequence"
+             << na                //21 "HMM id"
+             << na                //22 "HMM description"
+             ;
+          if (print_node)
+            td << fam;
+        }
+        else
+    	    td << targetName
+             << stxType_reported
+             << operonType
+             << refIdentity
+             << start
+             << stop
+             << strand
+             // Approximately if frameshift
+             << getA () -> refAccession
+             << getA () -> subClass
+             << getA () -> getIdentity () * 100.0
+             << getA () -> getRelCoverage () * 100.0
+             << getB () -> refAccession
+             << getB () -> subClass
+             << getB () -> getIdentity () * 100.0
+             << getB () -> getRelCoverage () * 100.0
+             ;
         td. newLn ();
       }
       else
@@ -533,8 +689,7 @@ void goodBlasts2operons (const VectorPtr<BlastAlignment> &goodBlastAls,
 {
   IMPLY (sameType, strong);
   
-  if (logPtr)
-    *logPtr << endl << "Good blasts:" << endl;
+  LOG ("\nGood blasts:");
 
   size_t start = 0;
   FFOR (size_t, i, goodBlastAls. size ())
@@ -577,11 +732,8 @@ void goodBlasts2operons (const VectorPtr<BlastAlignment> &goodBlastAls,
          )
       {
         Operon op (*al1, *al2);
-        if (logPtr)
-        {
-          *logPtr << "Operon:" << '\t' << op. getIdentity () << '\t' << stxClass2identity [op. al1->stxClass] << endl;  
-          op. saveTsvOut (logTd, true);  
-        }
+        LOG ("Operon:\t" + to_string (op. getIdentity ()) + "\t" + to_string (stxClass2identity [op. al1->stxClass]));
+        op. saveTsvOut (logTd, true);  
         if (   ! strong 
             || (   op. getIdentity () >= stxClass2identity [op. al1->stxClass]
                 && op. getIdentity () >= stxClass2identity [op. al2->stxClass]
@@ -596,11 +748,8 @@ void goodBlasts2operons (const VectorPtr<BlastAlignment> &goodBlastAls,
     }
   }
   
-  if (logPtr)
-  {
-    *logPtr << "# Operons: " << operons. size () << endl;
-	  *logPtr << endl << "Suppress goodBlastAls by operons" << endl;
-	}
+  LOG ("# Operons: " + to_string (operons. size ()));
+  LOG ("\nSuppress goodBlastAls by operons");
 
   for (const BlastAlignment* al : goodBlastAls)
   {
@@ -636,6 +785,8 @@ struct ThisApplication : ShellApplication
       addKey ("name", "Text to be added as the first column \"name\" to all rows of the report, for example it can be an assembly name", "", '\0', "NAME");
       addKey ("output", "Write output to OUTPUT_FILE instead of STDOUT", "", 'o', "OUTPUT_FILE");
     	addKey ("blast_bin", "Directory for BLAST. Deafult: $BLAST_BIN", "", '\0', "BLAST_DIR");
+    	addFlag ("amrfinder", "Print output in the nucleotide AMRFinderPlus format");
+    	addFlag ("print_node", "Print AMRFinderPlus hierarchy node");
 
       version = SVN_REV;
     }
@@ -649,9 +800,13 @@ struct ThisApplication : ShellApplication
                  input_name =             getArg ("name");
     const string output     =             getArg ("output");
           string blast_bin  =             getArg ("blast_bin");
+                 amrfinder  =             getFlag ("amrfinder");
+                 print_node =             getFlag ("print_node");
     
     if (contains (input_name, '\t'))
       throw runtime_error ("NAME cannot contain a tab character");
+    if (print_node && ! amrfinder)
+      throw runtime_error ("--print_node requires --amrfinder");
 
 
     stderr << "Software directory: " << shellQuote (execDir) << '\n';
@@ -756,20 +911,51 @@ struct ThisApplication : ShellApplication
     
     if (! input_name. empty ())
       td << "name";
-    td << "target_contig"
-       << "stx_type"
-       << "operon" 
-       << "identity"
-       << "target_start"
-       << "target_stop"
-       << "target_strand"
-       << "A_reference"
-       << "A_identity"
-       << "A_coverage"
-       << "B_reference"
-       << "B_identity"
-       << "B_coverage"
-       ; 
+    if (amrfinder)
+    {
+      td << /* 1*/ "Protein identifier"  
+         << /* 2*/ "Contig id"
+         << /* 3*/ "Start"
+         << /* 4*/ "Stop"
+         << /* 5*/ "Strand"
+         << /* 6*/ "Element symbol"  // PD-4924
+         << /* 7*/ "Element name"  // PD-4910
+         << /* 8*/ "Scope"
+         << /* 9*/ "Element type"
+         << /*10*/ "Element subtype"
+         << /*11*/ "Class"
+         << /*12*/ "Subclass"
+         << /*13*/ "Method"
+         << /*14*/ "Target length"
+         << /*15*/ "Reference sequence length"
+         << /*16*/ "% Coverage of reference sequence"
+         << /*17*/ "% Identity to reference sequence"
+         << /*18*/ "Alignment length"
+         << /*19*/ "Accession of closest sequence"
+         << /*20*/ "Name of closest sequence"
+         << /*21*/ "HMM id"
+         << /*22*/ "HMM description"
+         ;
+      if (print_node)
+        td << "Hierarchy node";  
+    }
+    else
+      td << "target_contig"
+         << "stx_type"
+         << "operon" 
+         << "identity"
+         << "target_start"
+         << "target_stop"
+         << "target_strand"
+         << "A_reference"
+         << "A_reference_subtype"
+         << "A_identity"
+         << "A_coverage"
+         << "B_reference"
+         << "B_reference_subtype"
+         << "B_identity"
+         << "B_coverage"
+         ; 
     td. newLn ();
 
 	  VectorOwn<BlastAlignment> blastAls;   
@@ -778,19 +964,15 @@ struct ThisApplication : ShellApplication
   	  while (f. nextLine ())
   	  {
   	    const Unverbose unv;
-  	    if (logPtr)
-  	      *logPtr << f. line << endl;
+  	    LOG (f. line);
   	    auto al = new BlastAlignment (f. line);
   	    al->qc ();  
  	      blastAls << al;
   	  }
   	}
   	
-  	if (logPtr)
-  	{
-  	  *logPtr << "# All stx blasts: " << blastAls. size () << endl;
-      *logPtr << "Finding frame shifts:" << endl;
-    }
+  	LOG ("# All stx blasts: " + to_string (blastAls. size ()));
+    LOG ("Finding frame shifts:");
 	  {
       // Multiple frame shifts are possible
       blastAls. sort (BlastAlignment::frameshiftLess); 
@@ -816,8 +998,7 @@ struct ThisApplication : ShellApplication
       }
     }
     
-    if (logPtr)
-      *logPtr << "All blasts:" << endl;
+    LOG ("All blasts:");
 	  VectorPtr<BlastAlignment> goodBlastAls;   
 	  {
       blastAls. sort (BlastAlignment::sameTypeLess);
@@ -864,22 +1045,18 @@ struct ThisApplication : ShellApplication
     
     Vector<Operon> operons;
 
-    if (logPtr)
-      *logPtr << endl << "Same type operons:" << endl;
+    LOG ("\nSame type operons:");
     goodBlasts2operons (goodBlastAls, operons, true, true, logTd);
     
     goodBlastAls. sort (BlastAlignment::less);
 
-    if (logPtr)
-      *logPtr << endl << "Strong operons:" << endl;
+    LOG ("\nStrong operons:");
     goodBlasts2operons (goodBlastAls, operons, false, true, logTd);
 
-    if (logPtr)
-      *logPtr << endl << "Weak operons:" << endl;
+    LOG ("\nWeak operons:");
     goodBlasts2operons (goodBlastAls, operons, false, false, logTd);
    	  
-  	if (logPtr)
-  	  *logPtr << endl << "goodOperons" << endl;
+  	LOG ("\ngoodOperons");
     Vector<Operon> goodOperons;
     {    
       operons. sort ();
@@ -939,8 +1116,7 @@ struct ThisApplication : ShellApplication
       }
     }
 
-  	if (logPtr)
-  	  *logPtr << endl << "goodBlastAls -> goodOperons (single-subunit)" << endl;
+  	LOG ("\ngoodBlastAls -> goodOperons (single-subunit)");
     goodBlastAls. sort (BlastAlignment::reportLess); 
     FFOR (size_t, i, goodBlastAls. size ())
     {

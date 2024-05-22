@@ -1,6 +1,6 @@
-#target_contig	stx_type	operon	identity	target_start	target_stop	target_strand	A_reference	A_identity	A_coverage	B_reference	B_identity	B_coverage
-A2l_a2e_equidistant	stx2l	COMPLETE	99.02	14780	16020	+	CAP17609.1	98.75	100.00	CAP17610.1	100.00	100.00
-PD-4797_multirow	stx1	PARTIAL	100.00	1625	2852	-	AAA98347.1	100.00	100.00	AAA71894.1	100.00	86.67
-PD-4897_multirow_contig_end	stx2	PARTIAL_CONTIG_END		11	274	+				AAA16361.1	100.00	100.00
-PD-4898_A2a_B2l	stx2a	COMPLETE	100.00	718	1958	+	QZL10984.1	100.00	100.00	QZL10985.1	100.00	100.00
-stx2d_better_stxB2k	stx2d	COMPLETE	100.00	3	1243	+	AAM22256.1	100.00	100.00	MCW3229578.1	100.00	100.00
+#target_contig	stx_type	operon	identity	target_start	target_stop	target_strand	A_reference	A_reference_subtype	A_identity	A_coverage	B_reference	B_reference_subtype	B_identity	B_coverage
+A2l_a2e_equidistant	stx2l	COMPLETE	99.02	14780	16020	+	CAP17609.1	stxA2l	98.75	100.00	CAP17610.1	stxB2	100.00	100.00
+PD-4797_multirow	stx1	PARTIAL	100.00	1625	2852	-	AAA98347.1	stxA1a	100.00	100.00	AAA71894.1	stxB1a	100.00	86.67
+PD-4897_multirow_contig_end	stx2	PARTIAL_CONTIG_END		11	274	+					AAA16361.1	stxB2b	100.00	100.00
+PD-4898_A2a_B2l	stx2a	COMPLETE	100.00	718	1958	+	QZL10984.1	stxA2a	100.00	100.00	QZL10985.1	stxB2	100.00	100.00
+stx2d_better_stxB2k	stx2d	COMPLETE	100.00	3	1243	+	AAM22256.1	stxA2	100.00	100.00	MCW3229578.1	stxB2d	100.00	100.00

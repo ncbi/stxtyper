@@ -667,7 +667,8 @@ bool isIdentifier (const string& name,
 
 
 
-bool isNatural (const string& name)
+bool isNatural (const string& name,
+                bool leadingZeroAllowed)
 {
   if (name. empty ())
     return false;
@@ -676,7 +677,7 @@ bool isNatural (const string& name)
       return false;
   if (name. size () == 1)
     return true;
-  if (name [0] == '0')
+  if (! leadingZeroAllowed && name [0] == '0')
     return false;
   return true;
 }
@@ -1360,25 +1361,25 @@ size_t Dir::create ()
 
 //
 
-void setSymlink (string path,
-                 const string &fName,
-                 bool pathIsAbsolute)
+void setSymlink (string fromFName,
+                 const string &toFName,
+                 bool fromPathIsAbsolute)
 { 
-  ASSERT (! path. empty ());
-  ASSERT (! fName. empty ());
-  const string err (string ("Cannot make ") + (pathIsAbsolute ? "an absolute" : "a relative") + " symlink for " + strQuote (path) + " as " + strQuote (fName));
-  if (pathIsAbsolute)
-    path = path2canonical (path);
+  ASSERT (! fromFName. empty ());
+  ASSERT (! toFName. empty ());
+  const string err (string ("Cannot make ") + (fromPathIsAbsolute ? "an absolute" : "a relative") + " symlink for " + strQuote (fromFName) + " as " + strQuote (toFName));
+  if (fromPathIsAbsolute)
+    fromFName = path2canonical (fromFName);
   else
   { 
-    if (path [0] == '/')
-      throw runtime_error (err + " because " + strQuote (path) + " is absolute");
-    const Dir dir (fName);
-    const string absPath (dir. getParent () + "/" + path);
+    if (fromFName [0] == '/')
+      throw runtime_error (err + " because " + strQuote (fromFName) + " is absolute");
+    const Dir dir (toFName);
+    const string absPath (dir. getParent () + "/" + fromFName);
     if (getFiletype (absPath, false) == Filetype::none)
       throw runtime_error (err + " because " + strQuote (absPath) + " does not exist");
   }
-  if (symlink (path. c_str (), fName. c_str ()))
+  if (symlink (fromFName. c_str (), toFName. c_str ()))
     throw runtime_error (err);
 }
 
@@ -1597,12 +1598,10 @@ void exec (const string &cmd,
 //Chronometer_OnePass cop (cmd);  
   if (verbose ())
   	cout << cmd << endl;
-  if (logPtr)
-  	*logPtr << cmd << endl;
+  LOG (cmd);
   	
 	const int status = system (cmd. c_str ());  // pipefail's are not caught
-	if (logPtr)
-	  *logPtr << "status = " << status << endl;	
+	LOG ("status = " + to_string (status));
 	if (status)
 	{
 	  string err (cmd + "\nstatus = " + to_string (status));
@@ -2264,12 +2263,12 @@ void Token::readInput (CharInput &in,
 	}
 	else if (isDigit (c) || c == '-')
 	{
+	  bool minusPossible = true;
 		while (   ! in. eof 
 		       && (   isDigit (c)
 		           || c == '.'
-		           || c == 'e'
-		           || c == 'E'
-		           || c == '-'
+		           || toUpper (c) == 'E'
+		           || (c == '-' && minusPossible)
 		           || c == 'x'
 		           || isHex (c)
 		          )
@@ -2277,6 +2276,7 @@ void Token::readInput (CharInput &in,
 		{ 
 			name += c;
 			c = in. get (); 
+			minusPossible = (toUpper (c) == 'E');
 		}
 		if (! in. eof)
 			in. unget ();
@@ -2504,7 +2504,7 @@ Token TokenInput::getXmlText ()
 	    ci. error ("XML text is not finished: end of file\n" + t. name, false);
 	  if (c == '<')
 	  {
-	    const char nextChar = getNextChar ();
+	    const char nextChar = getNextChar (true);
 	    if (nextChar == '/')
 	    {
 	      if (htmlTags)
@@ -2709,7 +2709,7 @@ Token TokenInput::getXmlMarkupDeclaration ()
 
 
 
-char TokenInput::getNextChar () 
+char TokenInput::getNextChar (bool unget) 
 { 
   QC_ASSERT (last. empty ());
 
@@ -2720,7 +2720,8 @@ char TokenInput::getNextChar ()
 	if (ci. eof)
 		return '\0';  
 		
-  ci. unget ();
+  if (unget)
+    ci. unget ();
   return c;
 }
 
@@ -2756,6 +2757,11 @@ void OFStream::open (const string &dirName,
 	QC_ASSERT (! fileName. empty ());
 	QC_ASSERT (! is_open ());
 	
+#if 0
+  if (! dirName. empty () && contains (fileName, '/'))
+    throw runtime_error ("Slash in file name: " + strQuote (fileName));
+#endif
+
 	string pathName;
 	if (! dirName. empty () && ! isDirName (dirName))
 	  pathName = dirName + "/";
@@ -2869,7 +2875,7 @@ Json::Json (JsonContainer* parent,
 
 string Json::toStr (const string& s)
 { 
-  if (isNatural (s))
+  if (isNatural (s, false))
     return s;
     
   // https://www.json.org/json-en.html
@@ -4019,6 +4025,7 @@ int Application::run (int argc,
   	{
   	  ASSERT (jRoot);
   		OFStream f (jsonFName);
+  		jRoot->qc ();
       jRoot->saveText (f);
       jRoot. reset ();
     }
@@ -4147,8 +4154,8 @@ string ShellApplication::getHelp () const
 
 void ShellApplication::body () const
 {
-  if (logPtr && useTmp)
-    *logPtr << tmp << endl;
+  if (useTmp)
+    LOG (tmp);
   shellBody ();
 }
 
@@ -4185,8 +4192,6 @@ string ShellApplication::fullProg (const string &progName) const
 	ASSERT (isDirName (dir));
 	return shellQuote (dir + progName) + " ";
 }
-#endif
-
 
 
 
@@ -4282,6 +4287,7 @@ string ShellApplication::getBlastThreadsParam (const string &blast,
     
   return s;
 }
+#endif   // _MSC_VER
 
 
 

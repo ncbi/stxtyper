@@ -152,6 +152,7 @@ void errorExitStr (const string &msg);
 
 [[noreturn]] void throwf (const string &s); 
   // For debugger: should not be inline
+  // Invokes: logic_error
 
 void beep ();
   // Requires: !isRedirected()
@@ -647,7 +648,7 @@ template <typename T>
           || ! iss. eof ()
           || iss. fail ()
          )
-        throwf ("Cannot convert " + strQuote (s) + " to number");
+        throw runtime_error ("Cannot convert " + strQuote (s) + " to number");
       return i;
     }
 
@@ -701,7 +702,8 @@ bool goodName (const string &name);
 bool isIdentifier (const string& name,
                    bool dashInName);
 
-bool isNatural (const string& name);
+bool isNatural (const string& name,
+                bool leadingZeroAllowed);
 
 void strUpper (string &s);
 
@@ -1097,7 +1099,7 @@ template <typename T>
   	  	  	return t;
   	  	  else
   	  	  	i++;
-  	  	throwf ("List index is out of range");
+  	  	throw runtime_error ("List index is out of range");
   	  	return T ();  // dummy
   	  }
   	size_t find (const T &t) const
@@ -1152,14 +1154,14 @@ template <typename T>
         }
     T popFront ()
       { if (P::empty ())
-          throwf ("popFront() empty list");
+          throw runtime_error ("popFront() empty list");
         const T t = P::front ();
         P::pop_front ();
         return t;
       }
     T popBack ()
       { if (P::empty ())
-          throwf ("popBack() empty list");
+          throw runtime_error ("popBack() empty list");
         const T t = P::back ();
         P::pop_back ();
         return t;
@@ -1261,6 +1263,13 @@ inline string shellQuote (string s)
   	return "\'" + s + "\'";
   }
 
+inline string getFileExtension (const string &path)  
+  { const size_t pos = path. rfind ('.');
+  	if (pos == string::npos)
+  		return noString;
+  	return path. substr (pos + 1);
+  }
+
 inline string trimExtension (const string &path)
   {
     const size_t pos = path. rfind ('.');
@@ -1273,7 +1282,7 @@ bool fileExists (const string &fName);
 
 inline void checkFile (const string &fName)
   { if (! fileExists (fName))
-      throwf ("File " + strQuote (fName) + " does not exist");
+      throw runtime_error ("File " + strQuote (fName) + " does not exist");
   }
 
 streamsize getFileSize (const string &fName);
@@ -1287,12 +1296,12 @@ void copyText (const string &inFName,
   inline void moveFile (const string &from,
                         const string &to)
     { if (::rename (from. c_str (), to. c_str ()))
-        throwf ("Cannot move file + " + shellQuote (from) + " to " + shellQuote (to));
+        throw runtime_error ("Cannot move file + " + shellQuote (from) + " to " + shellQuote (to));
     }
 
   inline void removeFile (const string &fName)
     { if (::remove (fName. c_str ()))
-        throwf ("Cannot remove file + " + shellQuote (fName));
+        throw runtime_error ("Cannot remove file + " + shellQuote (fName));
     }
 
       
@@ -1302,9 +1311,7 @@ void copyText (const string &inFName,
         free (p);
         return s;
       }
-      else
-        throwf ("path2canonical " + shellQuote (path));
-      return noString;  // dummy
+      throw runtime_error ("path2canonical " + shellQuote (path));
     }
   
   
@@ -1355,7 +1362,7 @@ struct Dir
     { if (items. empty ())
         return "..";
       if (items. size () == 1 && items. front (). empty ())
-        throwf ("Cannot get the parent directory of the root");
+        throw runtime_error ("Cannot get the parent directory of the root");
       const Dir parent (get () + "/..");
       return parent. get ();
     }
@@ -1368,9 +1375,9 @@ struct Dir
 
 
 
-void setSymlink (string path,
-                 const string &fName,
-                 bool pathIsAbsolute);
+void setSymlink (string fromFName,
+                 const string &toFName,
+                 bool fromPathIsAbsolute);
 
 
 
@@ -1719,7 +1726,7 @@ public:
 	  	  throwf ("Too many threads created");
 	  	try { threads. push_back (std::move (t)); }
 	  	  catch (const exception &e) 
-	  	    { throwf (string ("Cannot start thread\n") + e. what ()); }
+	  	    { throw runtime_error (string ("Cannot start thread\n") + e. what ()); }
 	  	return *this;
 	  }
 	bool exec (const string cmd,
@@ -1951,7 +1958,14 @@ extern unique_ptr<Xml::File> cxml;
 //////////////////////////////////////// Root ///////////////////////////////////////////
 
 struct Json;
+struct JsonNull;
+struct JsonInt;
+struct JsonDouble;
+struct JsonString;
+struct JsonBoolean;
 struct JsonContainer;
+struct JsonArray;
+struct JsonMap;  
 
 
 
@@ -1964,7 +1978,7 @@ public:
     {}
     // A desrtructor should be virtual to be automatically invoked by a descendant class destructor
   virtual Root* copy () const
-    { throwf ("Root::copy() is not implemented"); /*return nullptr;*/ }
+    { throwf ("Root::copy() is not implemented"); }
     // Return: the same type    
   virtual void qc () const
     {}
@@ -1985,7 +1999,7 @@ public:
     { throwf ("Root::saveXml() is not implemented"); }
   virtual Json* toJson (JsonContainer* /*parent_arg*/,
                         const string& /*name_arg*/) const
-    { throwf ("Root::toJson() is not implemented"); /*return nullptr;*/ }
+    { throwf ("Root::toJson() is not implemented"); }
 	virtual bool empty () const
 	  { return true; }
   virtual void clear ()
@@ -2113,7 +2127,7 @@ template <typename T>
   	  {
   	  #ifndef NDEBUG
   	    if (index >= P::size ())
-  	      throwf ("Vector " + operation + " operation: index = " + to_string (index) + ", but size = " + to_string (P::size ()));
+  	      throw runtime_error ("Vector " + operation + " operation: index = " + to_string (index) + ", but size = " + to_string (P::size ()));
   	  #endif
   	  }
   public:
@@ -2183,7 +2197,7 @@ template <typename T>
       }
     void checkSorted () const
       { if (! searchSorted)
-      	  throwf ("Vector is not sorted for search");
+      	  throw runtime_error ("Vector is not sorted for search");
       }
     Vector<T>& operator<< (const T &value)
       { P::push_back (value);
@@ -2229,14 +2243,14 @@ template <typename T>
         if ((*this) [index] == T ())
           (*this) [index] = value;
         else
-          throwf ("vector [" + to_string (index) +"] is not empty");
+          throw runtime_error ("vector [" + to_string (index) +"] is not empty");
       }
     void eraseAt (size_t index)
       { eraseMany (index, index + 1); }
     void eraseMany (size_t from,
                     size_t to)
       { if (to < from)
-          throwf ("Vector::eraseMany(): to < from");
+          throw runtime_error ("Vector::eraseMany(): to < from");
         if (to == from)
           return;
         checkIndex ("eraseMany", to - 1);
@@ -2271,7 +2285,7 @@ template <typename T>
       { 
       #ifndef NDEBUG
         if (P::empty ())
-          throwf ("Empty vector pop_back");
+          throw runtime_error ("Empty vector pop_back");
       #endif
         P::pop_back ();
       }
@@ -2279,7 +2293,7 @@ template <typename T>
       { T t = T ();
         while (n)
         { if (P::empty ())
-            throwf ("Cannot pop an empty vector");
+            throw runtime_error ("Cannot pop an empty vector");
           t = (*this) [P::size () - 1];
       	  P::pop_back ();
           n--;
@@ -2355,6 +2369,17 @@ template <typename T>
       { if (P::empty ())
       	  return no_index;
       	checkSorted ();
+      	if (P::size () < 8)  // PAR
+      	{
+      	  for (size_t i = 0; i < P::size (); i++)
+      	  {
+      	    if (value == (*this) [i])
+          	  return i;
+      	    if (value < (*this) [i])
+          	  return exact ? no_index : i;
+          }
+          return no_index;
+      	}
       	size_t lo = 0;  // vec.at(lo) <= value
       	size_t hi = P::size () - 1;  
       	// lo <= hi
@@ -2459,17 +2484,18 @@ template <typename T>
       void setMinus (const Vector<U> &other)
         { filterIndex ([&] (size_t i) { return other. containsFast ((*this) [i]); }); }
         
-    size_t findDuplicate () const
+    size_t findDuplicate (bool checkSortedP = true) const
       { if (P::size () <= 1)
           return no_index;
-        checkSorted ();
+        if (checkSortedP)
+          checkSorted ();
         for (size_t i = 1; i < P::size (); i++)
           if ((*this) [i] == (*this) [i - 1])
             return i;
         return no_index;
       }
-    bool isUniq () const
-      { return findDuplicate () == no_index; }
+    bool isUniq (bool checkSortedP = true) const
+      { return findDuplicate (checkSortedP) == no_index; }
     template <typename Equal /*bool equal (const T &a, const T &b)*/>
   	  void uniq (const Equal &equal)
   	    { if (P::size () <= 1)
@@ -3100,7 +3126,7 @@ template <typename T>
   		}
     size_t setMinus (const Set<T> &other)
       { if (universal)
-          throwf ("setMinus:universal");
+          throw runtime_error ("setMinus:universal");
       	size_t n = 0;
       	if (other. universal)
       	{ n = P::size ();
@@ -3227,7 +3253,7 @@ template <typename T>
       { arr. reserve (toReserve); }
   private:
     static void throwError (const string &str) 
-      { throwf ("Heap: " + str); }
+      { throw runtime_error ("Heap: " + str); }
   public:
 
 
@@ -3644,7 +3670,7 @@ struct LineInput : Input
 		  	return true;  
 			if (eof && eofAllowed)
 				return false;
-		  throwf ("No " + strQuote (prefix));
+		  throw runtime_error ("No " + strQuote (prefix));
 		  return false;  // dummy
 		}
 	string lineStr (bool add1 = true) const
@@ -3887,7 +3913,7 @@ public:
 
 
   [[noreturn]] void error (const Token &wrongToken,
-                           const string &expected)
+                           const string &expected) const
     { throw TextPos::Error (wrongToken. tp, expected, true); }
   [[noreturn]] void error (const string &what,
 	                         bool expected = true) const
@@ -3903,9 +3929,9 @@ public:
     // ... &>
   Token getXmlMarkupDeclaration ();
     // ... >
-  char getNextChar ();
+  char getNextChar (bool unget);
     // Return: '\0' <=> EOF
-    // Invokes: ci.unget()
+    // Invokes: if (unget) ci.unget()
 	void get (const string &expected)
     { const Token t (get ());
     	if (! t. isNameText (expected))
@@ -3922,9 +3948,8 @@ public:
    			error (t, Token::type2str (Token::eDouble) + " " + toString (expected)); 
     }
 	void get (char expected)
-    { const Token t (get ());
-    	if (! t. isDelimiter (expected))
-   			error (t, Token::type2str (Token::eDelimiter) + " " + strQuote (toString (expected), '\'')); 
+    { if (getNextChar (false) != expected)    
+   			error (Token::type2str (Token::eDelimiter) + " " + strQuote (toString (expected), '\'')); 
     }
   void setLast (Token &&t)
     { last = std::move (t); }
@@ -3943,16 +3968,6 @@ public:
 
 ///////////////////////////////////// Json //////////////////////////////////////////
 		
-struct JsonNull;
-struct JsonInt;
-struct JsonDouble;
-struct JsonString;
-struct JsonBoolean;
-struct JsonArray;
-struct JsonMap;
-  
-
-
 extern unique_ptr<JsonMap> jRoot;
 
 
@@ -4197,6 +4212,17 @@ public:
     }
 };
 
+
+
+template <typename T>
+  Json* vec2json (const Vector<T> &vec,
+                  JsonContainer* parent,
+                  const string& name = noString) 
+    { auto j = new JsonArray (parent, name);
+      for (const T& t : vec)
+        t. toJson (j);
+      return j;
+    }
 
 
 
