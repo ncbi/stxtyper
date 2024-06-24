@@ -76,8 +76,8 @@ The output of StxTyper is a tab-delimited file with the following fields, all pe
       terminating at contig boundaries
     - __PARTIAL_CONTIG_END__ for partial operons that could be split by contig
       boundaries due to sequencing or assembly artifacts
-    - __EXTENDED__ Where the coding sequence would extend beyond the stop codon
-      for the reference protein
+    - __EXTENDED__ The coding sequence extends beyond the reference stop codon
+      for one or both of the reference proteins
     - __INTERNAL_STOP__ for Stx operons where one of the subunits has a
       nonsense mutation
     - __FRAMESHIFT__ where StxTyper detected an indel in the coding sequence
