@@ -32,6 +32,7 @@
 * Dependencies: NCBI BLAST, gunzip (optional)
 *
 * Release changes:
+*  1.0.21 07/15/2024 PD-5038  ----nucleotide_output 
 *  1.0.20 05/21/2024 PD-5002  {A|B}_reference_subtype
 *  1.0.19 03/26/2024          BlastAlignment::targetAlign is removed
 *  1.0.18 03/19/2024 PD-4910  Element symbol is <stx type>_operon, Element name contains operon quality attribute"
@@ -384,7 +385,7 @@ struct BlastAlignment
       return    (targetStrand == (subunit == 'B') && targetStart           <= missed_max)
              || (targetStrand == (subunit == 'A') && targetLen - targetEnd <= missed_max);
     }
-  bool getExtended () const
+  bool getExtended () const  // On C-terminus
     { ASSERT (! truncated ());
       return ! refStart && refEnd + 1 == refLen; 
     }
@@ -501,7 +502,7 @@ struct Operon
         string stxType (getStxType (verboseP));
         const string standard ("COMPLETE");
         const bool novel =    al1->stxClass != al2->stxClass 
-                           || getIdentity () < stxClass2identity [al1->stxClass]
+                           || getIdentity () < stxClass2identity [al1->stxClass]  // May be due to X's
                            || stxType. size () <= 1;
         const string operonType =    getA () -> frameshift
                                   || getB () -> frameshift
@@ -787,6 +788,7 @@ struct ThisApplication : ShellApplication
     	addKey ("blast_bin", "Directory for BLAST. Deafult: $BLAST_BIN", "", '\0', "BLAST_DIR");
     	addFlag ("amrfinder", "Print output in the nucleotide AMRFinderPlus format");
     	addFlag ("print_node", "Print AMRFinderPlus hierarchy node");
+      addKey ("nucleotide_output", "Output nucleotide FASTA file of reported nucleotide sequences", "", '\0', "NUC_FASTA_OUT");
 
       version = SVN_REV;
     }
@@ -802,6 +804,7 @@ struct ThisApplication : ShellApplication
           string blast_bin  =             getArg ("blast_bin");
                  amrfinder  =             getFlag ("amrfinder");
                  print_node =             getFlag ("print_node");
+    const string  dna_out   = shellQuote (getArg ("nucleotide_output"));
     
     if (contains (input_name, '\t'))
       throw runtime_error ("NAME cannot contain a tab character");
@@ -903,9 +906,10 @@ struct ThisApplication : ShellApplication
     stxClass2identity ["2n"] = 0.98;
     stxClass2identity ["2o"] = 0.98;
     
-    
-    Cout out (output);
-    TsvOut td (& *out, 2, false);
+
+    const string tmpOut (tmp + "/out");
+    OFStream fOut (tmpOut);
+    TsvOut td (& fOut, 2, false);
     TsvOut logTd (logPtr, 2, false);
 
     
@@ -1150,6 +1154,27 @@ struct ThisApplication : ShellApplication
     goodOperons. sort (Operon::reportLess);     
   	for (const Operon& op : goodOperons)
    	  op. saveTsvOut (td, false);
+
+    // Output
+    {
+      TextTable tt (tmpOut);
+      tt. qc ();
+      {
+        Cout out (output);
+   		  tt. saveText (*out);
+   		}
+      if (! emptyArg (dna_out))
+      {
+        const StringVector columns {"target_contig", "target_start", "target_stop", "target_strand", "stx_type", "operon"};
+        tt. filterColumns (columns);
+        tt. saveHeader = false;
+        tt. qc ();
+        const string extract (tmp + "/extract");
+        tt. saveFile (extract);
+        prog2dir ["fasta_extract"] = execDir;
+        exec (fullProg ("fasta_extract") + dna_flat + " " + extract + qcS + " -log " + logFName + " > " + dna_out, logFName);  
+      }
+    }
   }
 };
 
