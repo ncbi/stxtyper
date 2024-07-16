@@ -47,8 +47,23 @@ function test_input_file {
 }
 
 
-test_input_file 'basic'
+test_input_file 'basic' '--nucleotide_output test/basic.nuc_out.got'
 FAILURES=$(( $? + $FAILURES ))
+# test --nucleotide_output option
+TESTS=$(( $TESTS + 1 ))
+if ! diff -q "test/basic.nuc_out.expected" "test/basic.nuc_out.got"
+then
+    echo "not ok: $STXTYPER returned --nucleotide_output file different from expected"
+    echo "#  $STXTYPER --nucleotide_output test/basic.nuc_out.got -n test/basic.fa > test/basic.got"
+    echo "# diff test/basic.nuc_out.expected test/basic.nuc_out.got"
+    diff "test/basic.nuc_out.expected" "test/basic.nuc_out.got"
+    echo "#  To approve run:"
+    echo "#     mv test/basic.nuc_out.got test/basic.nuc_out.expected "
+    TEST_TEXT="$TEST_TEXT"$'\n'"Failed basic --nucleotide_output test"
+    FAILURES=$(( $FAILURES + 1 ))
+else 
+    echo "ok: --nucleotide_output test/basic.nuc_out.got options worked"
+fi
 
 test_input_file 'synthetics'
 FAILURES=$(( $? + $FAILURES ))
