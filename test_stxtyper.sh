@@ -16,6 +16,12 @@ FAILURES=0
 TESTS=0
 TEST_TEXT=''
 
+# some color macros
+green=`tput setaf 2`  # Set green foreground color (code 2)
+red=`tput setaf 1`    # Set red foreground color (code 1)
+reset=`tput sgr0`     # Reset color to default
+
+
 function test_input_file {
     local test_base="$1"
     local options="$2"
@@ -24,14 +30,14 @@ function test_input_file {
 
     if ! $STXTYPER $options -n "test/$test_base.fa" > "test/$test_base.got"
     then
-        echo "not ok: $STXTYPER returned a non-zero exit value indicating a failure of the software"
+        echo "${red}not ok: $STXTYPER returned a non-zero exit value indicating a failure of the software${reset}"
         echo "#  $STXTYPER $options -n test/$test_base.fa > test/$test_base.got"
         TEST_TEXT="$TEST_TEXT"$'\n'"Failed $test_base"
         return 1
     else
         if ! diff -q "test/$test_base.expected" "test/$test_base.got"
         then
-            echo "not ok: $STXTYPER returned output different from expected"
+            echo "${red}not ok: $STXTYPER returned output different from expected${reset}"
             echo "#  $STXTYPER $options -n test/$test_base.fa > test/$test_base.got"
             echo "# diff test/$test_base.expected test/$test_base.got"
             diff "test/$test_base.expected" "test/$test_base.got"
@@ -40,7 +46,7 @@ function test_input_file {
             TEST_TEXT="$TEST_TEXT"$'\n'"Failed $test_base"
             return 1
         else
-            echo "ok: test/$test_base.fa"
+            echo "${green}ok:${reset} test/$test_base.fa"
             return 0
         fi
     fi
@@ -53,7 +59,7 @@ FAILURES=$(( $? + $FAILURES ))
 TESTS=$(( $TESTS + 1 ))
 if ! diff -q "test/basic.nuc_out.expected" "test/basic.nuc_out.got"
 then
-    echo "not ok: $STXTYPER returned --nucleotide_output file different from expected"
+    echo "${red}not ok: $STXTYPER returned --nucleotide_output file different from expected${reset}"
     echo "#  $STXTYPER --nucleotide_output test/basic.nuc_out.got -n test/basic.fa > test/basic.got"
     echo "# diff test/basic.nuc_out.expected test/basic.nuc_out.got"
     diff "test/basic.nuc_out.expected" "test/basic.nuc_out.got"
@@ -62,7 +68,7 @@ then
     TEST_TEXT="$TEST_TEXT"$'\n'"Failed basic --nucleotide_output test"
     FAILURES=$(( $FAILURES + 1 ))
 else 
-    echo "ok: --nucleotide_output test/basic.nuc_out.got options worked"
+    echo "${green}ok:${reset} --nucleotide_output test/basic.nuc_out.got options worked"
 fi
 
 test_input_file 'synthetics'
@@ -86,8 +92,8 @@ echo ""
 if [ "$FAILURES" -gt 0 ]
 then
     PASSED=$(( $TESTS - $FAILURES ))
-    echo "not ok overall: $FAILURES out of $TESTS stxtyper tests failed"
+    echo "${red}not ok overall: $FAILURES out of $TESTS stxtyper tests failed${reset}"
     exit 1
 else
-    echo "ok: all $TESTS stxtyper tests passed"
+    echo "${green}ok: all $TESTS stxtyper tests passed${reset}"
 fi
