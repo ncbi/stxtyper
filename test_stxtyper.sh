@@ -17,10 +17,16 @@ TESTS=0
 TEST_TEXT=''
 
 # some color macros
-green=`tput setaf 2`  # Set green foreground color (code 2)
-red=`tput setaf 1`    # Set red foreground color (code 1)
-reset=`tput sgr0`     # Reset color to default
-
+if [ "$TERM" != "" ]
+then
+    green=`tput setaf 2`  # Set green foreground color (code 2)
+    red=`tput setaf 1`    # Set red foreground color (code 1)
+    reset=`tput sgr0`     # Reset color to default
+else
+    green='' # no colors
+    red=''
+    reset=''
+fi
 
 function test_input_file {
     local test_base="$1"
