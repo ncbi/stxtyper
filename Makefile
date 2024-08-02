@@ -42,13 +42,6 @@ ifneq '$(INSTALL_DIR)' ''
 	bindir=$(INSTALL_DIR)
 endif
 bindir ?= $(PREFIX)/bin
-ifneq '$(CONDA_DB_DIR)' ''
-	DBDIR := -D'CONDA_DB_DIR="$(CONDA_DB_DIR)"'
-endif
-ifneq '$(DEFAULT_DB_DIR)' ''
-	DBDIR := -D'CONDA_DB_DIR="$(DEFAULT_DB_DIR)"'
-endif
-
 
 # detect system architecture and set appropriate flags
 # this is probably not the best way (i.e. M1 Mac would be arm64)
@@ -74,13 +67,21 @@ endif
 # was: -std=gnu++14 
 
 CXX=g++
-COMPILE.cpp= $(CXX) $(CPPFLAGS) $(SVNREV) $(DBDIR) $(TEST_UPDATE_DB) -c 
+COMPILE.cpp= $(CXX) $(CPPFLAGS) $(SVNREV) $(DBDIR) -c 
 
 
 .PHONY: all clean install release test
 
 BINARIES= stxtyper fasta_check fasta_extract
 DATABASE= stx.prot
+TEST= test/amrfinder_integration.expected   test/cases.expected \
+test/amrfinder_integration.fa         test/cases.fa \
+test/amrfinder_integration2.expected  test/synthetics.expected \
+test/amrfinder_integration2.fa        test/synthetics.fa \
+test/basic.expected                   test/virulence_ecoli.expected \
+test/basic.fa                         test/virulence_ecoli.fa \
+test/basic.nuc_out.expected
+
 
 all:	$(BINARIES)
 
@@ -116,23 +117,20 @@ install:
 	$(INSTALL) $(BINARIES) $(DATABASE) $(DESTDIR)$(bindir) 
 
 # stxtyper binaries for github binary release
-GITHUB_FILE=stxtyper_binaries_v$(VERSION_STRING)
-GITHUB_FILES = $(BINARIES) $(DATABASE)
-github_binaries:
+GITHUB_FILE=stxtyper_v$(VERSION_STRING)_$(ARCH)_$(OS)
+GITHUB_FILES = $(BINARIES) $(DATABASE) version.txt test_stxtyper.sh
+binary_dist:
 	@if [ ! -e version.txt ]; \
 	then \
 		echo >&2 "version.txt required to make a distribution file"; \
 		false; \
 	fi
-#   first recompile stxtyper.o to pick up the new version info
-	rm stxtyper.o stxtyper
-	make
 	mkdir $(GITHUB_FILE)
-	echo $(VERSION_STRING) > $(GITHUB_FILE)/version.txt
 	cp $(GITHUB_FILES) $(GITHUB_FILE)
+	mkdir $(GITHUB_FILE)/test
+	cp $(TEST) $(GITHUB_FILE)/test
 	if [ -e $(GITHUB_FILE).tar.gz ]; then rm $(GITHUB_FILE).tar.gz; fi
-	cd $(GITHUB_FILE); tar cvfz ../$(GITHUB_FILE).tar.gz *
-#	tar cvfz $(GITHUB_FILE).tar.gz $(GITHUB_FILE)/*
+	tar cvfz $(GITHUB_FILE).tar.gz $(GITHUB_FILE)/*
 	rm -r $(GITHUB_FILE)/*
 	rmdir $(GITHUB_FILE)
 
