@@ -32,6 +32,7 @@
 * Dependencies: NCBI BLAST, gunzip (optional)
 *
 * Release changes:
+*  1.0.24 08/05/2024 PD-5076  "na" -> "NA"
 *  1.0.23 07/29/2024 PD-5064  AMBIGUOUS operon type
 *  1.0.22 07/25/2024          First codon L|I|V -> M
 *  1.0.21 07/15/2024 PD-5038  --nucleotide_output 
@@ -112,7 +113,7 @@ constexpr size_t intergenic_max {36};  // Max. intergenic region in the referenc
 constexpr size_t slack = 30;  
 
 const string stxS ("stx");
-const string na ("na");
+const string na ("NA");
 
 
 
