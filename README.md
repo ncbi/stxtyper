@@ -55,11 +55,23 @@ If you install BLAST via conda in this way you will need to run `conda activate 
 
 - `--output <output_file>` or `-o <output_file>` Write the output to \<output\_file\> instead of STDOUT
 
+- `--nucleotide_output <output_fasta>` Output the nucleotide sequence for any identified stx operons (includes partial and full length operons)
+
 - `--blast_bin <path>` Directory to search for tblastn binary. Overrides environment variable `$BLAST_BIN` and the default PATH.
 
 - `-q` or `--quiet` Suppress the status messages normally written to STDERR.
 
-- `--log <log_file>` Error log file, appended and opened when you first run the application. This is used for debugging
+- `--log <log_file>` Error log file, appended and opened when you first run the application. This is used for debugging.
+
+- `--debug` Run in debug mode. Additional messages are printed and files in $TMPDIR are not removed after running.
+
+### For AMRFinderPlus
+
+These options are not expected to be used outside of the [AMRFinderPlus](https://github.com/ncbi/amr/wiki) pipeline.
+
+- `--amrfinder` Output in [AMRFinderPlus](https://github.com/ncbi/amr/wiki) format
+
+- `--print_node` Add column for [Hierarchy node](https://www.ncbi.nlm.nih.gov/pathogens/docs/gene_hierarchy/) optionally reported by AMRFinderPlus.
 
 ## Output
 
@@ -67,11 +79,10 @@ The output of StxTyper is a tab-delimited file with the following fields, all pe
 
 1. __target_contig__: The contig identifier from the input FASTA file
 2. __stx_type__: The stx type called by the algorithm, for "operon = COMPLETE"
-   it will be stx plus two characters (e.g., stx1a), for other values of operon stx_type will be
-   stx1, stx2, or just stx if it can't resolve at all.
+   it will be stx plus two characters (e.g., stx1a), for other values of operon
+   stx_type will be stx1, stx2, or just stx if it can't resolve at all.
 3. __operon__: What status the operon was found to be. It can be
-    - __COMPLETE__ for complete and fully typeable
-      known stx types
+    - __COMPLETE__ for complete and fully typeable known stx types
     - __PARTIAL__ for partial operons that are internal to contigs and not
       terminating at contig boundaries
     - __PARTIAL_CONTIG_END__ for partial operons that could be split by contig
@@ -82,6 +93,9 @@ The output of StxTyper is a tab-delimited file with the following fields, all pe
       nonsense mutation
     - __FRAMESHIFT__ where StxTyper detected an indel in the coding sequence
       that would cause a frame shift in one or more of the subunits
+    - __AMBIGUOUTS__ StxTyper found an ambiguous base in the query sequence
+      (e.g., N), this could be the result sequencing or assembly error so the
+      user might want to take a closer look at the sequence.
     - __COMPLETE_NOVEL__ a full-length stx operon that is not typeable using
       the current scheme
 4. __identity__ The combined percent identity for both A and B subunits
@@ -92,12 +106,18 @@ The output of StxTyper is a tab-delimited file with the following fields, all pe
 none aligned
 9. __A_identity__ The percent identity to the reference for the A subunit,
 empty if none aligned
-10. __A_coverage__ The percentage of the reference for the A subunit that is
+10. __A_reference_subtype__ The subtype assigned to the reference sequence for
+the A subunit. Note this may be different from the subtype for the operon as a
+whole.
+11. __A_coverage__ The percentage of the reference for the A subunit that is
 covered by the alignment, empty if none aligned
-11. __B_reference__ The closest reference protein for the B subunit, empty if
+12. __B_reference__ The closest reference protein for the B subunit, empty if
 none aligned
-12. __B_identity__ The percent identity to the reference for the B subunit,
+13. __B_reference_subtype__ The subtype assigned to the reference sequence for
+the B subunit. Note this may be different from the subtype for the operon as a
+whole.
+14. __B_identity__ The percent identity to the reference for the B subunit,
 empty if none aligned
-13. __B_coverage__ The percentage of the reference for the B subunit that is
+15. __B_coverage__ The percentage of the reference for the B subunit that is
 covered by the alignment, empty if none aligned
 
