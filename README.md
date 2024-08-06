@@ -2,7 +2,7 @@
 
 # StxTyper
 
-StxTyper is used to determine stx type from nucleotide sequence. Stx (shiga-toxin) genes are found in some strains of _Escherichia coli_ and code for powerful toxins that can cause severe illness. StxTyper is software to classify these genes from assembled sequence using a standard algorithm.
+StxTyper is used to determine stx type from nucleotide sequence. Stx (Shiga-toxin) genes are found in some strains of _Escherichia coli_ and code for powerful toxins that can cause severe illness. StxTyper is software to classify these genes from assembled sequence using a standard algorithm.
 
 # Installation
 
