@@ -1,5 +1,6 @@
 *.o
 stxtyper
 fasta_check
+fasta_extract
 stx.prot.*
 *.got

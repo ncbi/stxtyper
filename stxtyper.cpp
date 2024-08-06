@@ -32,6 +32,10 @@
 * Dependencies: NCBI BLAST, gunzip (optional)
 *
 * Release changes:
+*  1.0.24 08/05/2024 PD-5076  "na" -> "NA"
+*  1.0.23 07/29/2024 PD-5064  AMBIGUOUS operon type
+*  1.0.22 07/25/2024          First codon L|I|V -> M
+*  1.0.21 07/15/2024 PD-5038  --nucleotide_output 
 *  1.0.20 05/21/2024 PD-5002  {A|B}_reference_subtype
 *  1.0.19 03/26/2024          BlastAlignment::targetAlign is removed
 *  1.0.18 03/19/2024 PD-4910  Element symbol is <stx type>_operon, Element name contains operon quality attribute"
@@ -109,7 +113,7 @@ constexpr size_t intergenic_max {36};  // Max. intergenic region in the referenc
 constexpr size_t slack = 30;  
 
 const string stxS ("stx");
-const string na ("na");
+const string na ("NA");
 
 
 
@@ -135,7 +139,7 @@ string stxType_reported_operon2elementName (const string &stxType_reported,
 
 struct BlastAlignment 
 {
-  size_t length {0}, nident {0}  // aa
+  size_t length {0}, nident {0}, positives {0}  // aa
        ,    refStart {0},    refEnd {0},    refLen {0}
        , targetStart {0}, targetEnd {0}, targetLen {0};
     // Positions are 0-based
@@ -200,10 +204,27 @@ struct BlastAlignment
       	      
 	    length = targetSeq. size ();
 	    nident = 0;
+	    positives = 0;
 	    QC_ASSERT (targetSeq. size () == refSeq. size ());
 	    FFOR (size_t, i, targetSeq. size ())
 	      if (targetSeq [i] == refSeq [i])
+	      {
 	        nident++;
+	        positives++;
+	      }
+	      else
+	        if (   targetSeq [i] == 'X'
+	            || refSeq    [i] == 'X'
+	           )
+  	        positives++;
+	    if (   refStart == 0 
+	        && charInSet (targetSeq [0], "LIV") 
+	        && refSeq [0] == 'M'
+	       )
+	    {
+	      nident++;
+	      positives++;
+	    }
 
       stxClass = stxType;
       if (   stxType == "2a"
@@ -240,14 +261,16 @@ struct BlastAlignment
         return;
       QC_ASSERT (length);
       QC_ASSERT (nident);
-      QC_ASSERT (nident <= length);
+      QC_ASSERT (nident <= positives);
+    //QC_ASSERT (nident <= length);
+      QC_ASSERT (positives <= length);
 	    QC_ASSERT (targetStart < targetEnd);
 	    QC_ASSERT (targetEnd <= targetLen);
       QC_ASSERT (refStart < refEnd);
 	    QC_ASSERT (refEnd <= refLen);
 	    if (! frameshift)
 	    {
-  	    QC_ASSERT (nident <= refEnd - refStart);
+  	    QC_ASSERT (positives <= refEnd - refStart);
   	    QC_ASSERT (refEnd - refStart <= length);	    
   	  }
       QC_ASSERT (! targetName. empty ());
@@ -358,9 +381,12 @@ struct BlastAlignment
         refStart = prev. refStart;
       else
         refEnd = prev. refEnd;
-      length += prev. length;  // Approximately
-      nident += prev. nident;  // Approximately
+      // Approximately
+      length      += prev. length;  
+      nident      += prev. nident;  
+      positives   += prev. positives;
     //targetAlign += prev. targetAlign;
+      //
       if (prev. stopCodon)
         stopCodon = true;
       frameshift = true;
@@ -384,7 +410,7 @@ struct BlastAlignment
       return    (targetStrand == (subunit == 'B') && targetStart           <= missed_max)
              || (targetStrand == (subunit == 'A') && targetLen - targetEnd <= missed_max);
     }
-  bool getExtended () const
+  bool getExtended () const  // On C-terminus
     { ASSERT (! truncated ());
       return ! refStart && refEnd + 1 == refLen; 
     }
@@ -401,6 +427,8 @@ struct BlastAlignment
       s += string (len - refEnd, '-'); 
       return s;
     }
+  bool ambig () const
+    { return nident < positives; }
   static bool frameshiftLess (const BlastAlignment* a,
                               const BlastAlignment* b)
     { ASSERT (a);
@@ -513,12 +541,14 @@ struct Operon
                                         || getB () -> truncated ()
                                         ? "PARTIAL_CONTIG_END"
                                         : partial ()
-                                          ? "PARTIAL"  
+                                          ? "PARTIAL"  // Complete ??
                                           :    getA () -> getExtended ()
                                             || getB () -> getExtended ()
-                                            ? "EXTENDED"
+                                            ? "EXTENDED"  // Complete ??
                                             : novel
-                                              ? standard + "_NOVEL"
+                                              ? ambig ()
+                                                ? "AMBIGUOUS"
+                                                : standard + "_NOVEL"
                                               : standard;
         if (! verboseP)
         {
@@ -648,6 +678,10 @@ private:
   bool partial () const
     { return    (getA () -> getRelCoverage () < 1.0 && ! getA () -> getExtended ())
              || (getB () -> getRelCoverage () < 1.0 && ! getB () -> getExtended ());
+    }
+  bool ambig () const
+    { return    getA () -> ambig ()
+             || getB () -> ambig ();
     }
 public:
   double getIdentity () const
@@ -787,6 +821,7 @@ struct ThisApplication : ShellApplication
     	addKey ("blast_bin", "Directory for BLAST. Deafult: $BLAST_BIN", "", '\0', "BLAST_DIR");
     	addFlag ("amrfinder", "Print output in the nucleotide AMRFinderPlus format");
     	addFlag ("print_node", "Print AMRFinderPlus hierarchy node");
+      addKey ("nucleotide_output", "Output nucleotide FASTA file of reported nucleotide sequences", "", '\0', "NUC_FASTA_OUT");
 
       version = SVN_REV;
     }
@@ -802,6 +837,7 @@ struct ThisApplication : ShellApplication
           string blast_bin  =             getArg ("blast_bin");
                  amrfinder  =             getFlag ("amrfinder");
                  print_node =             getFlag ("print_node");
+    const string  dna_out   = shellQuote (getArg ("nucleotide_output"));
     
     if (contains (input_name, '\t'))
       throw runtime_error ("NAME cannot contain a tab character");
@@ -903,9 +939,10 @@ struct ThisApplication : ShellApplication
     stxClass2identity ["2n"] = 0.98;
     stxClass2identity ["2o"] = 0.98;
     
-    
-    Cout out (output);
-    TsvOut td (& *out, 2, false);
+
+    const string tmpOut (tmp + "/out");
+    OFStream fOut (tmpOut);
+    TsvOut td (& fOut, 2, false);
     TsvOut logTd (logPtr, 2, false);
 
     
@@ -1150,6 +1187,27 @@ struct ThisApplication : ShellApplication
     goodOperons. sort (Operon::reportLess);     
   	for (const Operon& op : goodOperons)
    	  op. saveTsvOut (td, false);
+
+    // Output
+    {
+      TextTable tt (tmpOut);
+      tt. qc ();
+      {
+        Cout out (output);
+   		  tt. saveText (*out);
+   		}
+      if (! emptyArg (dna_out))
+      {
+        const StringVector columns {"target_contig", "target_start", "target_stop", "target_strand", "stx_type", "operon"};
+        tt. filterColumns (columns);
+        tt. saveHeader = false;
+        tt. qc ();
+        const string extract (tmp + "/extract");
+        tt. saveFile (extract);
+        prog2dir ["fasta_extract"] = execDir;
+        exec (fullProg ("fasta_extract") + dna_flat + " " + extract + qcS + " -log " + logFName + " > " + dna_out, logFName);  
+      }
+    }
   }
 };
 

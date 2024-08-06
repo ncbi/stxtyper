@@ -156,6 +156,7 @@ void errorExitStr (const string &msg);
 
 void beep ();
   // Requires: !isRedirected()
+  //           SHLVL = 1 ??
     
 
 
@@ -744,9 +745,11 @@ inline void trim (string &s)
 
 void trimLeading (string &s,
                   char c);
+  // Invokes: isSpace()
 
 void trimTrailing (string &s,
                    char c);
+  // Invokes: isSpace()
 
 inline void trim (string &s,
                   char c)
@@ -1295,13 +1298,13 @@ void copyText (const string &inFName,
 #ifndef _MSC_VER
   inline void moveFile (const string &from,
                         const string &to)
-    { if (::rename (from. c_str (), to. c_str ()))
-        throw runtime_error ("Cannot move file + " + shellQuote (from) + " to " + shellQuote (to));
+    { if (const int code = ::rename (from. c_str (), to. c_str ()))
+        throw runtime_error ("Cannot move file + " + shellQuote (from) + " to " + shellQuote (to) + " (" + to_string (code) + ")");
     }
 
   inline void removeFile (const string &fName)
-    { if (::remove (fName. c_str ()))
-        throw runtime_error ("Cannot remove file + " + shellQuote (fName));
+    { if (const int code = ::remove (fName. c_str ()))
+        throw runtime_error ("Cannot remove file + " + shellQuote (fName) + " (" + to_string (code) + ")");
     }
 
       
@@ -1478,12 +1481,21 @@ struct Color
 };
   
   
-inline string colorize (const string &s,
-                        bool active)
-  { if (! active)
+inline string colorize_raw (const string &s,
+                            Color::Type color,
+                            bool screen)
+  { if (! screen)
       return s;
-    return Color::code (Color::white, true) + s + Color::code ();
+    return Color::code (color, true) + s + Color::code ();
   }
+
+inline string colorize (const string &s,
+                        bool screen)
+  { return colorize_raw (s, Color::white, screen); }
+
+inline string colorizeUrl (const string &s,
+                           bool screen)
+  { return colorize_raw (s, Color::blue, screen); }
   
 
 class OColor
@@ -1892,6 +1904,7 @@ struct Xml
 
   
   struct TextFile : File
+  // Tag::name: idenifier with possible '-'
   {
   private:
     struct XmlStream : OFStream
@@ -1925,7 +1938,7 @@ struct Xml
   //   <Data> ::= <nameIndex> <Data>* 0 0 <text> 0
   //     <nameIndex> ::= <byte> <byte>
   //   Number of different Tag::name's <= 2^16
-  //   Tag::name has no: '\0', '\n'
+  //   Tag::name: no '\0', '\n'
   {
   private:
   	ofstream os;
@@ -2966,21 +2979,24 @@ template <typename T>
   	    { operator= (other); }
   	template <typename U, typename V>
     	Set<T>& operator= (const map<U,V> &other)
-    	  { universal = false;
+    	  { P::clear ();
+    	    universal = false;
     	    for (const auto& it : other)
   	        P::insert (it. first);
   	      return *this;
     	  }
   	template <typename U, typename V>
     	Set<T>& operator= (const unordered_map<U,V> &other)
-    	  { universal = false;
+    	  { P::clear ();
+    	    universal = false;
     	    for (const auto& it : other)
   	        P::insert (it. first);
   	      return *this;
     	  }
   	template <typename U>
     	Set<T>& operator= (const vector<U> &other)
-    	  { universal = false;
+    	  { P::clear ();
+    	    universal = false;
     	    for (const U& u : other)
   	        P::insert (u);
   	      return *this;
@@ -3913,8 +3929,9 @@ public:
 
 
   [[noreturn]] void error (const Token &wrongToken,
-                           const string &expected) const
-    { throw TextPos::Error (wrongToken. tp, expected, true); }
+                           const string &what,
+                           bool expected = true) const
+    { throw TextPos::Error (wrongToken. tp, what, expected); }
   [[noreturn]] void error (const string &what,
 	                         bool expected = true) const
 		{ ci. error (what, expected); }  
@@ -3948,7 +3965,8 @@ public:
    			error (t, Token::type2str (Token::eDouble) + " " + toString (expected)); 
     }
 	void get (char expected)
-    { if (getNextChar (false) != expected)    
+    { const Token t (get ());
+      if (! t. isDelimiter (expected))
    			error (Token::type2str (Token::eDelimiter) + " " + strQuote (toString (expected), '\'')); 
     }
   void setLast (Token &&t)
@@ -4445,7 +4463,10 @@ struct Application : Singleton<Application>, Root
 {  
   const string description;
   string version {"0.0.0"};
-  string documentationUrl;
+  // Without "https://"
+  string documentationUrl;  
+  string updatesUrl;  
+  //
   string updatesDoc;
   const bool needsArg;
   const bool gnu;
@@ -4603,10 +4624,10 @@ protected:
     {}
   virtual void initVar ()
     {}
-  string getInstruction (bool coutP) const;
-  string getDocumentation () const;
-  string getUpdates () const;
-  virtual string getHelp () const;
+  string getInstruction (bool screen) const;
+  string getDocumentation (bool screen) const;
+  string getUpdates (bool screen) const;
+  virtual string getHelp (bool screen) const;
     // Requires: must be printed to cout
   string makeKey (const string &param,
                   const string &value) const
@@ -4664,7 +4685,7 @@ protected:
   void initVar () override;
     // stderr << "Running: " << getCommandLine ()
     // threads_max correction
-  string getHelp () const override;
+  string getHelp (bool screen) const override;
 private:
   void body () const final;
   virtual void shellBody () const = 0;
