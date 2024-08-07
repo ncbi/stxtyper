@@ -2,7 +2,7 @@
 
 # StxTyper
 
-StxTyper is used to determine stx type from nucleotide sequence. Stx (shiga-toxin) genes are found in some strains of _Escherichia coli_ and code for powerful toxins that can cause severe illness. StxTyper is software to classify these genes from assembled sequence using a standard algorithm.
+StxTyper is used to determine stx type from nucleotide sequence. Stx (Shiga-toxin) genes are found in some strains of _Escherichia coli_ and code for powerful toxins that can cause severe illness. StxTyper is software to classify these genes from assembled sequence using a standard algorithm.
 
 # Installation
 
@@ -108,7 +108,7 @@ The output of StxTyper is a tab-delimited file with the following fields, all pe
       nonsense mutation
     - __FRAMESHIFT__ where StxTyper detected an indel in the coding sequence
       that would cause a frame shift in one or more of the subunits
-    - __AMBIGUOUTS__ StxTyper found an ambiguous base in the query sequence
+    - __AMBIGUOUS__ StxTyper found an ambiguous base in the query sequence
       (e.g., N), this could be the result sequencing or assembly error so the
       user might want to take a closer look at the sequence.
     - __COMPLETE_NOVEL__ a full-length stx operon that is not typeable using
