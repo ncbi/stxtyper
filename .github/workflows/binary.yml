@@ -3,7 +3,7 @@ name: binary tarball
 on: 
     workflow_dispatch:
     release:
-        branches: [ master ]
+        branches: [ master, dev ]
     repository_dispatch:
         types: [linux-binary-test, install-test]
     schedule: 
@@ -18,7 +18,7 @@ jobs:
               sudo apt-get update
               sudo apt-get install -y ncbi-blast+ 
         - name: download
-          run: bash -x .github/workflows/get_binary_release.sh > dirname
+          run: bash -x .github/workflows/get_binary_release.sh | tee | tail -1 > dirname
         - name: 
           run: stxtyper_v*/stxtyper -v
         - name: run tests included with distribution
