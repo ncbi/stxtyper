@@ -4,6 +4,7 @@ on:
     workflow_dispatch:
     release:
         branches: [ master, dev ]
+    push:
     repository_dispatch:
         types: [linux-binary-test, install-test]
     schedule: 
