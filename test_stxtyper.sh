@@ -19,15 +19,15 @@ TEST_TEXT=''
 echo "TERM=$TERM"
 
 # some color macros
-if [ "$TERM" != "" ]
+if [ "$TERM" == "" || "$TERM" == "dumb" ]
 then
-    green=`tput setaf 2`  # Set green foreground color (code 2)
-    red=`tput setaf 1`    # Set red foreground color (code 1)
-    reset=`tput sgr0`     # Reset color to default
-else
     green='' # no colors
     red=''
     reset=''
+else
+    green=`tput setaf 2`  # Set green foreground color (code 2)
+    red=`tput setaf 1`    # Set red foreground color (code 1)
+    reset=`tput sgr0`     # Reset color to default
 fi
 
 function test_input_file {
