@@ -8,11 +8,6 @@ StxTyper is used to determine stx type from nucleotide sequence. Stx (shiga-toxi
 
 ## Prerequisites
 
-### C compiler and make
-
-These generally come standard for unix systems, if not the user will need to intall make
-and GCC. MacOS users will need to go to the [App store and install
-Xcode](https://apps.apple.com/in/app/xcode/id497799835?mt=12). 
 
 ### NCBI BLAST
 
@@ -32,12 +27,32 @@ Then run:
 
 If you install BLAST via conda in this way you will need to run `conda activate blast` before you can run StxTyper.
 
+### C compiler and make
+
+These are necessary if compiling from source. If using the binary distribution,
+or Bioconda you won't need to worry about these. They generally come standard
+for unix systems, if not the user will need to intall make and GCC. MacOS users
+will need to go to the [App store and install
+Xcode](https://apps.apple.com/in/app/xcode/id497799835?mt=12). 
+
 ## Compiling
+
+StxTyper should compile cleanly for Mac and Linux x86 and ARM, though our official policy is we only support x86 Linux.
 
     git clone https://github.com/evolarjun/stxtyper.git
     cd stxtyper
     make
     make test
+
+## Installing from binary
+
+Download the latest binary tarball from https://github.com/ncbi/stxtyper/releases. Untar it and run the tests e.g.:
+
+    tar xvfz stxtyper_v*.tar.gz
+    cd stxtyper_v*/
+    ./test_stxtyper.sh
+
+Note that we are currently only publishing binary tarballs for x86 linux.
 
 # Usage
 
