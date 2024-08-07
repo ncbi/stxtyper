@@ -16,6 +16,8 @@ FAILURES=0
 TESTS=0
 TEST_TEXT=''
 
+echo "-$TERM-"
+
 # some color macros
 if [ "$TERM" != "" ]
 then
