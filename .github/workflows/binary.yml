@@ -3,8 +3,7 @@ name: binary tarball
 on: 
     workflow_dispatch:
     release:
-        branches: [ master, dev ]
-    push:
+        branches: [ master ]
     repository_dispatch:
         types: [linux-binary-test, install-test]
     schedule: 
