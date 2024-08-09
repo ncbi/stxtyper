@@ -6,38 +6,65 @@ StxTyper is used to determine stx type from nucleotide sequence. Stx (Shiga-toxi
 
 # Installation
 
-## Prerequisites
+## Installing with Bioconda
 
-### C compiler and make
+You'll need Mamba ([Installation instructions](https://mamba.readthedocs.io/en/latest/installation/micromamba-installation.html)) first.
 
-These generally come standard for unix systems, if not the user will need to intall make
-and GCC. MacOS users will need to go to the [App store and install
-Xcode](https://apps.apple.com/in/app/xcode/id497799835?mt=12). 
+    micromamba create -n stxtyper ncbi-stxtyper \
+      --channel conda-forge \
+      --channel bioconda \
+      --channel defaults \
+      --strict-channel-priority
 
-### NCBI BLAST
+## Installing from binary
 
-StxTyper needs NCBI BLAST binaries in your path (specifically tblastn). If you don't
-already have BLAST installed see https://www.ncbi.nlm.nih.gov/books/NBK569861/
-for instructions to install BLAST binaries.
+### Prerequisites 
 
-Blast can also be installed using bioconda by first installing bioconda, then making sure to activate the environment in which it's installed. 
-- See the [official install miniconda instructions for Linux](https://docs.anaconda.com/free/miniconda/#quick-command-line-install)
-- See the [official install miniconda instructions for MacOS](https://docs.conda.io/en/latest/miniconda.html)
+#### NCBI BLAST+
 
-Then run:
+See below under "Compiling" for instructions to install NCBI BLAST+.
 
-    source ~/miniconda3/bin/activate
-    conda create -y -c conda-forge -c bioconda -n blast blast
-    conda activate blast
+### Download and install Binary
 
-If you install BLAST via conda in this way you will need to run `conda activate blast` before you can run StxTyper.
+Download the latest binary tarball from https://github.com/ncbi/stxtyper/releases. Untar it and run the tests e.g.:
+
+    tar xvfz stxtyper_v*.tar.gz
+    cd stxtyper_v*/
+    ./test_stxtyper.sh
+
+Note that we are currently only publishing binary tarballs for x86 linux.
 
 ## Compiling
+
+### Prerequisites
+
+#### NCBI BLAST+
+
+StxTyper needs NCBI BLAST binaries in your path (specifically tblastn). If you
+don't already have BLAST installed see
+https://www.ncbi.nlm.nih.gov/books/NBK569861/ for the official instructions to
+install BLAST binaries. It's also available in many package repositories, for
+example on Ubuntu:
+
+    sudo apt-get install ncbi-blast+
+
+#### C compiler and make
+
+These are necessary if compiling from source. If using the binary distribution,
+or Bioconda you won't need to worry about these. They generally come standard
+for unix systems, if not the user will need to intall make and GCC. MacOS users
+will need to go to the [App store and install
+Xcode](https://apps.apple.com/in/app/xcode/id497799835?mt=12). 
+
+### Compiling
+
+StxTyper should compile cleanly for Mac and Linux x86 and ARM, though our official policy is we only support x86 Linux.
 
     git clone https://github.com/evolarjun/stxtyper.git
     cd stxtyper
     make
     make test
+
 
 # Usage
 

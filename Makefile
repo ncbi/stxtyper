@@ -114,7 +114,7 @@ install:
 	then \
 		mkdir -p $(DESTDIR)$(bindir); \
 	fi
-	$(INSTALL) $(BINARIES) $(DATABASE) $(DESTDIR)$(bindir) 
+	$(INSTALL) $(BINARIES) $(DATABASE) test_stxtyper.sh $(DESTDIR)$(bindir) 
 
 # stxtyper binaries for github binary release
 GITHUB_FILE=stxtyper_v$(VERSION_STRING)_$(ARCH)_$(OS)

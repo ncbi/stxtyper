@@ -1,0 +1,29 @@
+name: binary tarball
+
+on: 
+    workflow_dispatch:
+    release:
+        branches: [ master ]
+    repository_dispatch:
+        types: [linux-binary-test, install-test]
+    schedule: 
+        - cron: '15  15  *   *   *' # 3:15pm every day
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+        - uses: actions/checkout@v4
+        - name: prerequisites
+          run: |
+              sudo apt-get update
+              sudo apt-get install -y ncbi-blast+ 
+              echo "TERM=-$TERM-"
+        - name: download
+          run: bash -x .github/workflows/get_binary_release.sh | tee | tail -1 > dirname
+        - name: 
+          run: stxtyper_v*/stxtyper -v
+        - name: run tests included with distribution
+          run: |
+              directory=$(cat dirname)
+              cd $directory
+              ./test_stxtyper.sh
