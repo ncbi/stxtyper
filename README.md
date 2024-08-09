@@ -6,10 +6,47 @@ StxTyper is used to determine stx type from nucleotide sequence. Stx (Shiga-toxi
 
 # Installation
 
-## Prerequisites
+## Installing from binary
 
+### Prerequisites 
 
-### NCBI BLAST
+#### NCBI BLAST+
+
+See below under "Compiling" for instructions to install.
+
+### Download and install Binary
+
+Download the latest binary tarball from https://github.com/ncbi/stxtyper/releases. Untar it and run the tests e.g.:
+
+    tar xvfz stxtyper_v*.tar.gz
+    cd stxtyper_v*/
+    ./test_stxtyper.sh
+
+Note that we are currently only publishing binary tarballs for x86 linux.
+
+## Installing with Bioconda
+
+You'll need Mamba ([Installation instructions](https://mamba.readthedocs.io/en/latest/installation/micromamba-installation.html)) or Conda ([Installation instructions](https://docs.anaconda.com/miniconda/miniconda-install/)) first.
+
+    conda create -n stxtyper ncbi-stxtyper \
+      --channel conda-forge \
+      --channel bioconda \
+      --channel defaults \
+      --strict-channel-priority
+
+or
+
+    micromamba create -n stxtyper ncbi-stxtyper \
+      --channel conda-forge \
+      --channel bioconda \
+      --channel defaults \
+      --strict-channel-priority
+
+## Compiling
+
+### Prerequisites
+
+#### NCBI BLAST+
 
 StxTyper needs NCBI BLAST binaries in your path (specifically tblastn). If you don't
 already have BLAST installed see https://www.ncbi.nlm.nih.gov/books/NBK569861/
@@ -27,7 +64,7 @@ Then run:
 
 If you install BLAST via conda in this way you will need to run `conda activate blast` before you can run StxTyper.
 
-### C compiler and make
+#### C compiler and make
 
 These are necessary if compiling from source. If using the binary distribution,
 or Bioconda you won't need to worry about these. They generally come standard
@@ -35,7 +72,7 @@ for unix systems, if not the user will need to intall make and GCC. MacOS users
 will need to go to the [App store and install
 Xcode](https://apps.apple.com/in/app/xcode/id497799835?mt=12). 
 
-## Compiling
+### Compiling
 
 StxTyper should compile cleanly for Mac and Linux x86 and ARM, though our official policy is we only support x86 Linux.
 
@@ -44,15 +81,6 @@ StxTyper should compile cleanly for Mac and Linux x86 and ARM, though our offici
     make
     make test
 
-## Installing from binary
-
-Download the latest binary tarball from https://github.com/ncbi/stxtyper/releases. Untar it and run the tests e.g.:
-
-    tar xvfz stxtyper_v*.tar.gz
-    cd stxtyper_v*/
-    ./test_stxtyper.sh
-
-Note that we are currently only publishing binary tarballs for x86 linux.
 
 # Usage
 
