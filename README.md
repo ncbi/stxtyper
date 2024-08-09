@@ -6,13 +6,23 @@ StxTyper is used to determine stx type from nucleotide sequence. Stx (Shiga-toxi
 
 # Installation
 
+## Installing with Bioconda
+
+You'll need Mamba ([Installation instructions](https://mamba.readthedocs.io/en/latest/installation/micromamba-installation.html)) first.
+
+    micromamba create -n stxtyper ncbi-stxtyper \
+      --channel conda-forge \
+      --channel bioconda \
+      --channel defaults \
+      --strict-channel-priority
+
 ## Installing from binary
 
 ### Prerequisites 
 
 #### NCBI BLAST+
 
-See below under "Compiling" for instructions to install.
+See below under "Compiling" for instructions to install NCBI BLAST+.
 
 ### Download and install Binary
 
@@ -24,45 +34,19 @@ Download the latest binary tarball from https://github.com/ncbi/stxtyper/release
 
 Note that we are currently only publishing binary tarballs for x86 linux.
 
-## Installing with Bioconda
-
-You'll need Mamba ([Installation instructions](https://mamba.readthedocs.io/en/latest/installation/micromamba-installation.html)) or Conda ([Installation instructions](https://docs.anaconda.com/miniconda/miniconda-install/)) first.
-
-    conda create -n stxtyper ncbi-stxtyper \
-      --channel conda-forge \
-      --channel bioconda \
-      --channel defaults \
-      --strict-channel-priority
-
-or
-
-    micromamba create -n stxtyper ncbi-stxtyper \
-      --channel conda-forge \
-      --channel bioconda \
-      --channel defaults \
-      --strict-channel-priority
-
 ## Compiling
 
 ### Prerequisites
 
 #### NCBI BLAST+
 
-StxTyper needs NCBI BLAST binaries in your path (specifically tblastn). If you don't
-already have BLAST installed see https://www.ncbi.nlm.nih.gov/books/NBK569861/
-for instructions to install BLAST binaries.
+StxTyper needs NCBI BLAST binaries in your path (specifically tblastn). If you
+don't already have BLAST installed see
+https://www.ncbi.nlm.nih.gov/books/NBK569861/ for the official instructions to
+install BLAST binaries. It's also available in many package repositories, for
+example on Ubuntu:
 
-Blast can also be installed using bioconda by first installing bioconda, then making sure to activate the environment in which it's installed. 
-- See the [official install miniconda instructions for Linux](https://docs.anaconda.com/free/miniconda/#quick-command-line-install)
-- See the [official install miniconda instructions for MacOS](https://docs.conda.io/en/latest/miniconda.html)
-
-Then run:
-
-    source ~/miniconda3/bin/activate
-    conda create -y -c conda-forge -c bioconda -n blast blast
-    conda activate blast
-
-If you install BLAST via conda in this way you will need to run `conda activate blast` before you can run StxTyper.
+    sudo apt-get install ncbi-blast+
 
 #### C compiler and make
 
