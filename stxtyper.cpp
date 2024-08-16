@@ -32,6 +32,7 @@
 * Dependencies: NCBI BLAST, gunzip (optional)
 *
 * Release changes:
+*  1.0.25 08/16/2024 PD-5085  AMRFinderPlus column names to match MicroBIGG-E
 *  1.0.24 08/05/2024 PD-5076  "na" -> "NA"
 *  1.0.23 07/29/2024 PD-5064  AMBIGUOUS operon type
 *  1.0.22 07/25/2024          First codon L|I|V -> M
@@ -94,6 +95,7 @@
 #include "common.hpp"
 #include "tsv.hpp"
 using namespace Common_sp;
+#include "amrfinder_columns.hpp"
 
 #include "common.inc"
 
@@ -950,31 +952,31 @@ struct ThisApplication : ShellApplication
       td << "name";
     if (amrfinder)
     {
-      td << /* 1*/ "Protein identifier"  
-         << /* 2*/ "Contig id"
-         << /* 3*/ "Start"
-         << /* 4*/ "Stop"
-         << /* 5*/ "Strand"
-         << /* 6*/ "Element symbol"  // PD-4924
-         << /* 7*/ "Element name"  // PD-4910
-         << /* 8*/ "Scope"
-         << /* 9*/ "Element type"
-         << /*10*/ "Element subtype"
-         << /*11*/ "Class"
-         << /*12*/ "Subclass"
-         << /*13*/ "Method"
-         << /*14*/ "Target length"
-         << /*15*/ "Reference sequence length"
-         << /*16*/ "% Coverage of reference sequence"
-         << /*17*/ "% Identity to reference sequence"
-         << /*18*/ "Alignment length"
-         << /*19*/ "Accession of closest sequence"
-         << /*20*/ "Name of closest sequence"
-         << /*21*/ "HMM id"
-         << /*22*/ "HMM description"
+      td << /* 1*/ prot_colName 
+         << /* 2*/ contig_colName
+         << /* 3*/ start_colName
+         << /* 4*/ stop_colName
+         << /* 5*/ strand_colName
+         << /* 6*/ genesymbol_colName
+         << /* 7*/ elemName_colName
+         << /* 8*/ scope_colName
+         << /* 9*/ type_colName
+         << /*10*/ subtype_colName
+         << /*11*/ class_colName
+         << /*12*/ subclass_colName
+         << /*13*/ method_colName
+         << /*14*/ targetLen_colName
+         << /*15*/ refLen_colName
+         << /*16*/ refCov_colName
+         << /*17*/ refIdent_colName
+         << /*18*/ alignLen_colName
+         << /*19*/ closestRefAccession_colName
+         << /*20*/ closestRefName_colName
+         << /*21*/ hmmAccession_colName
+         << /*22*/ hmmDescr_colName
          ;
       if (print_node)
-        td << "Hierarchy node";  
+        td << hierarchyNode_colName;  
     }
     else
       td << "target_contig"
