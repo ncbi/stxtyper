@@ -11,6 +11,28 @@ else
     STXTYPER=./stxtyper
 fi
 
+if [ ! -e "test/basic.expected" ]
+then
+    echo "test/basic.expected not found, downloading new test data"
+    echo "from https://raw.githubusercontent.com/ncbi/stxtyper/main/"
+    mkdir test
+    pushd test
+        curl --location --silent -O https://raw.githubusercontent.com/ncbi/stxtyper/main/test/amrfinder_integration.expected \
+             -O https://raw.githubusercontent.com/ncbi/stxtyper/main/test/amrfinder_integration.fa \
+             -O https://raw.githubusercontent.com/ncbi/stxtyper/main/test/amrfinder_integration2.expected \
+             -O https://raw.githubusercontent.com/ncbi/stxtyper/main/test/amrfinder_integration2.fa \
+             -O https://raw.githubusercontent.com/ncbi/stxtyper/main/test/basic.expected \
+             -O https://raw.githubusercontent.com/ncbi/stxtyper/main/test/basic.fa \
+             -O https://raw.githubusercontent.com/ncbi/stxtyper/main/test/basic.nuc_out.expected \
+             -O https://raw.githubusercontent.com/ncbi/stxtyper/main/test/cases.expected \
+             -O https://raw.githubusercontent.com/ncbi/stxtyper/main/test/cases.fa \
+             -O https://raw.githubusercontent.com/ncbi/stxtyper/main/test/synthetics.expected \
+             -O https://raw.githubusercontent.com/ncbi/stxtyper/main/test/synthetics.fa \
+             -O https://raw.githubusercontent.com/ncbi/stxtyper/main/test/virulence_ecoli.expected \
+             -O https://raw.githubusercontent.com/ncbi/stxtyper/main/test/virulence_ecoli.fa
+    popd
+fi
+
 # globals updated by function test_input_file
 FAILURES=0
 TESTS=0
@@ -19,7 +41,7 @@ TEST_TEXT=''
 echo "TERM=$TERM"
 
 # some color macros
-if [ "$TERM" == "" || "$TERM" == "dumb" ]
+if [ "$TERM" == "" ] || [ "$TERM" == "dumb" ]
 then
     green='' # no colors
     red=''
