@@ -1,9 +1,10 @@
 name: Linux bioconda 
 
 on:
+    push:
     workflow_dispatch:
     schedule:
-        - cron: '30 10 * * *' # 3:15am everyday
+        - cron: '30 10 * * *' # 
     repository_dispatch:
         types: [linux-bioconda-test, install-test]
 jobs:
