@@ -1,0 +1,34 @@
+name: Linux bioconda 
+
+on:
+    workflow_dispatch:
+    schedule:
+        - cron: '30 10 * * *' # 3:15am everyday
+    repository_dispatch:
+        types: [linux-bioconda-test, install-test]
+jobs:
+  x86_linux:
+    runs-on: ubuntu-latest
+    steps:
+    - name: When was this run
+      run: date
+    - name: configure conda
+      run: |
+          . $CONDA/bin/activate
+          conda config --add channels defaults
+          conda config --add channels bioconda
+          conda config --add channels conda-forge
+    - name: install StxTyper
+      run: |
+          . $CONDA/bin/activate
+          conda install --update-deps -c conda-forge -c bioconda --strict-channel-priority -y stxtyper
+          stxtyper --version
+    - name: download tests
+      run: |
+          BASE_URL=https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/master
+          curl --silent --location -O ${BASE_URL}/test_stxtyper.sh
+    - name: run tests
+      run: |
+          source /usr/share/miniconda/bin/activate
+          echo CONDA_PREFIX = $CONDA_PREFIX
+          bash ./test_stxtyper.sh path
