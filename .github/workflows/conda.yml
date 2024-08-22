@@ -22,7 +22,7 @@ jobs:
     - name: install StxTyper
       run: |
           . $CONDA/bin/activate
-          conda install --update-deps -c conda-forge -c bioconda --strict-channel-priority -y stxtyper
+          conda install --update-deps -c conda-forge -c bioconda --strict-channel-priority -y ncbi-stxtyper
           stxtyper --version
     - name: download tests
       run: |
