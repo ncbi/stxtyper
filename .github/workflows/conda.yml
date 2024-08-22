@@ -63,7 +63,7 @@ jobs:
           curl --silent --location -O ${BASE_URL}/test_stxtyper.sh
     - name: Run tests
       run: |
-          source /usr/share/miniconda/bin/activate
+          source /Users/runner/miniconda3/bin/activate
           echo CONDA_PREFIX = $CONDA_PREFIX
           bash ./test_stxtyper.sh path
 
