@@ -53,15 +53,15 @@ jobs:
           # Is this faster than installing miniconda myself?
           # sudo chown -R 501:20 $CONDA
           conda update conda
-	- name: Install StxTyper
-	  run: |
+    - name: Install StxTyper
+      run: |
           source /Users/runner/miniconda3/bin/activate
           conda install --update-deps -c bioconda -c conda-forge -y ncbi-stxtyper
-	- name: Download tests
-	  run: |
-		  BASE_URL=https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/master
+    - name: Download tests
+      run: |
+          BASE_URL=https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/master
           curl --silent --location -O ${BASE_URL}/test_stxtyper.sh
-	- name: Run tests
+    - name: Run tests
           source /usr/share/miniconda/bin/activate
           echo CONDA_PREFIX = $CONDA_PREFIX
           bash ./test_stxtyper.sh path
