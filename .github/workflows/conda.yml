@@ -1,0 +1,70 @@
+name: Bioconda 
+
+on:
+    workflow_dispatch:
+    schedule:
+        - cron: '30 10 * * *' # 
+    repository_dispatch:
+        types: [linux-bioconda-test, install-test]
+jobs:
+  x86_linux:
+    runs-on: ubuntu-latest
+    steps:
+    - name: When was this run
+      run: date
+    - name: configure conda
+      run: |
+          . $CONDA/bin/activate
+          conda config --add channels defaults
+          conda config --add channels bioconda
+          conda config --add channels conda-forge
+    - name: install StxTyper
+      run: |
+          . $CONDA/bin/activate
+          conda install --update-deps -c conda-forge -c bioconda --strict-channel-priority -y ncbi-stxtyper
+          stxtyper --version
+    - name: download tests
+      run: |
+          BASE_URL=https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/master
+          curl --silent --location -O ${BASE_URL}/test_stxtyper.sh
+    - name: run tests
+      run: |
+          source /usr/share/miniconda/bin/activate
+          echo CONDA_PREFIX = $CONDA_PREFIX
+          bash ./test_stxtyper.sh path
+  x86_mac:
+    runs-on: macos-latest
+    steps:
+    - name: Install conda b/c built-in conda was borked
+      run: |
+          curl -O https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh
+          bash ./Miniconda3-latest-MacOSX-x86_64.sh -b -p /Users/runner/miniconda3
+    - name: Configure conda
+      run: |
+          source /Users/runner/miniconda3/bin/activate
+          conda init
+          # THIS DOESN"T WORK! Just install miniconda myself
+          # . $CONDA/bin/activate
+          conda config --add channels defaults
+          conda config --add channels bioconda
+          conda config --add channels conda-forge
+          # permissions are messed up on the mac runner
+          # Is this faster than installing miniconda myself?
+          # sudo chown -R 501:20 $CONDA
+          conda update conda
+    - name: Install StxTyper
+      run: |
+          source /Users/runner/miniconda3/bin/activate
+          conda install --update-deps -c bioconda -c conda-forge -y ncbi-stxtyper
+    - name: Download tests
+      run: |
+          BASE_URL=https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/master
+          curl --silent --location -O ${BASE_URL}/test_stxtyper.sh
+    - name: Run tests
+      run: |
+          source /Users/runner/miniconda3/bin/activate
+          echo CONDA_PREFIX = $CONDA_PREFIX
+          bash ./test_stxtyper.sh path
+
+
+

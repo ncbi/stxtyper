@@ -90,17 +90,17 @@ all:	$(BINARIES)
 
 common.o:	common.hpp common.inc
 
-stxtyper.o:  common.hpp common.inc 
+stxtyper.o:  common.hpp common.inc amrfinder_columns.hpp tsv.hpp version.txt 
 stxtyperOBJS=stxtyper.o common.o tsv.o
 stxtyper:	$(stxtyperOBJS)
 	$(CXX) -o $@ $(stxtyperOBJS) -pthread $(DBDIR)
 
-fasta_check.o:	common.hpp common.inc 
+fasta_check.o:	common.hpp common.inc version.txt 
 fasta_checkOBJS=fasta_check.o common.o 
 fasta_check:	$(fasta_checkOBJS)
 	$(CXX) -o $@ $(fasta_checkOBJS)
 
-fasta_extract.o:	common.hpp common.inc 
+fasta_extract.o:	common.hpp common.inc version.txt 
 fasta_extractOBJS=fasta_extract.o common.o 
 fasta_extract:	$(fasta_extractOBJS)
 	$(CXX) -o $@ $(fasta_extractOBJS)
