@@ -1,7 +1,6 @@
 name: Bioconda 
 
 on:
-    push:
     workflow_dispatch:
     schedule:
         - cron: '30 10 * * *' # 
