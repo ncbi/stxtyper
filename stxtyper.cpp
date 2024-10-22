@@ -32,6 +32,7 @@
 * Dependencies: NCBI BLAST, gunzip (optional)
 *
 * Release changes:
+*  1.0.26 10/22/2024 PD-5085  Change column "Element length" to "Target length"
 *  1.0.25 08/16/2024 PD-5085  AMRFinderPlus column names to match MicroBIGG-E
 *  1.0.24 08/05/2024 PD-5076  "na" -> "NA"
 *  1.0.23 07/29/2024 PD-5064  AMBIGUOUS operon type
@@ -649,7 +650,7 @@ private:
         return al1->stxType;
       if (al1->stxClass != al2->stxClass)
       {
-      //return al1->stxClass + "/" + al2->stxClass;  ??  // order alphabetically
+      //return al1->stxClass + fusion_infix + al2->stxClass;  ??  // order alphabetically
         if (al1->stxSuperClass == al2->stxSuperClass)
           return al1->stxSuperClass;  
         return noString;
