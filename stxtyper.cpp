@@ -32,6 +32,7 @@
 * Dependencies: NCBI BLAST, gunzip (optional)
 *
 * Release changes:
+*  1.0.27 10/23/2024 PD-5155  "Hierarchy node" with mixed types is <stx1>::<stx2>
 *  1.0.26 10/22/2024 PD-5085  Change column "Element length" to "Target length"
 *  1.0.25 08/16/2024 PD-5085  AMRFinderPlus column names to match MicroBIGG-E
 *  1.0.24 08/05/2024 PD-5076  "na" -> "NA"
@@ -581,7 +582,7 @@ struct Operon
         //const double refCoverage = double (al1->getAbsCoverage () + al2->getAbsCoverage ()) / double (refLen) * 100.0;
           const size_t alignmentLen = al1->length + al2->length;
           const string refAccessions (al1->refAccession + ", " + al2->refAccession);
-          const string fam (al1->getGenesymbol () + ", " + al2->getGenesymbol ());
+          const string fam (al1->getGenesymbol () + fusion_infix + al2->getGenesymbol ());
           td << na                // 1 "Protein identifier"  
              << targetName        // 2 "Contig id"
              << start             // 3 "Start"
@@ -650,7 +651,7 @@ private:
         return al1->stxType;
       if (al1->stxClass != al2->stxClass)
       {
-      //return al1->stxClass + fusion_infix + al2->stxClass;  ??  // order alphabetically
+      //return al1->stxClass + fusion_infix + al2->stxClass;  // order alphabetically
         if (al1->stxSuperClass == al2->stxSuperClass)
           return al1->stxSuperClass;  
         return noString;
