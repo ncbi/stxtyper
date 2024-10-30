@@ -1,5 +1,7 @@
 # StxTyper
 
+[![Latest StxTyper version](https://img.shields.io/github/v/release/ncbi/stxtyper)](https://github.com/ncbi/stxtyper/releases/latest) [![Latest Anaconda version](https://img.shields.io/conda/vn/bioconda/ncbi-stxtyper)](https://anaconda.org/bioconda/ncbi-stxtyper)
+
 StxTyper is used to determine stx type from nucleotide sequence. Stx (Shiga-toxin) genes are found in some strains of _Escherichia coli_ and code for powerful toxins that can cause severe illness. StxTyper is software to classify these genes from assembled sequence using a standard algorithm.
 
 ## WARNING: This is currently beta software and changes and new releases may come quickly. Please report any issues or comments to pd-help@ncbi.nlm.nih.gov or open an issue on GitHub.
