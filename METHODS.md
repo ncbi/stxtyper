@@ -1,5 +1,7 @@
 # StxTyper methods description
 
+We are working on a paper and will point to it here once it is available, but in the meantime the following is a quick description of the typing algoirthm.
+
 ## Only "complete" operons are typed
 
 Only operons that have both stxA and stxB subunits aligning over 100% of their reference coding sequences are typed using the following algorithm.
