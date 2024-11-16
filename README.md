@@ -8,6 +8,8 @@ StxTyper is used to determine stx type from nucleotide sequence. Stx (Shiga-toxi
 
 # Installation
 
+Note StxTyper is included with [AMRFinderPlus](https://github.com/ncbi/amr/wiki) as of version 4.0 and is run by AMRFinderPlus when the `--organism Escherichia option is used`. If you have installed AMRFinderPlus you don't need to separately install StxTyper.
+
 ## Installing with Bioconda
 
 You'll need Mamba ([Installation instructions](https://mamba.readthedocs.io/en/latest/installation/micromamba-installation.html)) first.
@@ -67,6 +69,9 @@ StxTyper should compile cleanly for Mac and Linux x86 and ARM, though our offici
     make
     make test
 
+## Docker
+
+StxTyper is included with several Docker images including the [ncbi/amr](https://hub.docker.com/r/ncbi/amr/) docker image.
 
 # Usage
 
