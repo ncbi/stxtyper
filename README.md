@@ -93,7 +93,7 @@ StxTyper is included with several Docker images including the [ncbi/amr](https:/
 
 - `--blast_bin <path>` Directory to search for tblastn binary. Overrides environment variable `$BLAST_BIN` and the default PATH.
 
-- `--amrfinder` Print the output in the fields that match AMRFinderPlus output. See below for details.
+- `--amrfinder` Print the output in the fields that match AMRFinderPlus output. [See below for details](#--amrfinder-output).
 
 - `--print_node` In the `--amrfinder` output format add the "Hierarchy node" as the last column. See the [field description in the AMRFinderPlus documentation](https://github.com/ncbi/amr/wiki/Running-AMRFinderPlus#fields) for details.
 
