@@ -32,6 +32,8 @@
 * Dependencies: NCBI BLAST, gunzip (optional)
 *
 * Release changes:
+*  1.0.28 12/03/2024          tblastn -gapextend 2
+*         10/30/2024          colorizeDir()
 *  1.0.27 10/23/2024 PD-5155  "Hierarchy node" with mixed types is <stx1>::<stx2>
 *  1.0.26 10/22/2024 PD-5085  Change column "Element length" to "Target length"
 *  1.0.25 08/16/2024 PD-5085  AMRFinderPlus column names to match MicroBIGG-E
@@ -813,7 +815,7 @@ void goodBlasts2operons (const VectorPtr<BlastAlignment> &goodBlastAls,
 
 // ThisApplication
 
-struct ThisApplication : ShellApplication
+struct ThisApplication final : ShellApplication
 {
   ThisApplication ()
     : ShellApplication ("Determine stx type(s) of a genome, print .tsv-file", true, false, true, true)
@@ -849,14 +851,14 @@ struct ThisApplication : ShellApplication
       throw runtime_error ("--print_node requires --amrfinder");
 
 
-    stderr << "Software directory: " << shellQuote (execDir) << '\n';
+    const bool screen = ! isRedirected (cerr);
+
+    stderr << "Software directory: " << colorizeDir (execDir, screen) << '\n';
     stderr << "Version: " << version << '\n'; 
     
 		const string logFName (tmp + "/log"); 
     const string qcS (qc_on ? " -qc" : "");
 
-
-    #define BLASTX 0
 
     // blast_bin
     if (blast_bin. empty ())
@@ -865,62 +867,34 @@ struct ThisApplication : ShellApplication
     if (! blast_bin. empty ())
     {
 	    addDirSlash (blast_bin);
-	  #if BLASTX
-	    prog2dir ["blastx"]      = blast_bin;
-	  #else
 	    prog2dir ["tblastn"]     = blast_bin;  
 	    prog2dir ["makeblastdb"] = blast_bin;  
-	  #endif
 	  }
 
     const string dna_flat = uncompress (fName,  "dna_flat");
     
-  #if BLASTX
-    size_t nDna = 0;
-    size_t dnaLen_max = 0;
-    size_t dnaLen_total = 0;
-  #endif
     {
       prog2dir ["fasta_check"] = execDir;
       exec (fullProg ("fasta_check") + dna_flat + "  -hyphen  -ambig  " + qcS + "  -log " + logFName + " > " + tmp + "/nseq", logFName); 
     	const StringVector vec (tmp + "/nseq", (size_t) 10, true); 
     	if (vec. size () != 3)
         throw runtime_error ("fasta_check failed: " + vec. toString ("\n"));
-    #if BLASTX
-      nDna         = str2<size_t> (vec [0]);
-      dnaLen_max   = str2<size_t> (vec [1]);
-      dnaLen_total = str2<size_t> (vec [2]);
-    #endif
     }
-  #if BLASTX
-    QC_ASSERT (nDna);
-    QC_ASSERT (dnaLen_max);
-    QC_ASSERT (dnaLen_total);
-  #endif
 
 	//stderr. section ("Running blast");
 	  const string blastOut (tmp + "/blast");
 		{
 			const Chronometer_OnePass_cerr cop ("blast");
  			// Database: created by ~brovervv/code/database/stx.prot.sh
-    #if BLASTX
- 			findProg ("blastx");
-  		const string blast_fmt ("-outfmt '6 qseqid sseqid qstart qend qlen sstart send slen qseq sseq'");
-			exec (fullProg ("blastx") + " -query " + dna_flat + " -db " + execDir + "stx.prot  " 
-			      + "-comp_based_stats 0  -evalue 1e-10  -seg no  -max_target_seqs 10000  -word_size 5  -query_gencode " + to_string (gencode) + " "
-			      + getBlastThreadsParam ("blastx", min (nDna, dnaLen_total / 10002)) 
-			      + " " + blast_fmt + " -out " + blastOut + " > /dev/null 2> " + tmp + "/blast-err", tmp + "/blast-err");
- 		#else
  			findProg ("makeblastdb");
  			exec (fullProg ("makeblastdb") + "-in " + dna_flat + "  -dbtype nucl  -out " + tmp + "/db  -logfile " + tmp + "/db.log  > /dev/null", tmp + "db.log");
  			findProg ("tblastn");
   		const string blast_fmt ("-outfmt '6 sseqid qseqid sstart send slen qstart qend qlen sseq qseq'");
 			exec (fullProg ("tblastn") + " -query " + execDir + "stx.prot  -db " + tmp + "/db  "
-			      + "-comp_based_stats 0  -evalue 1e-10  -seg no  -max_target_seqs 10000  -word_size 5  -db_gencode " + to_string (gencode) 
+			      + "-comp_based_stats 0  -evalue 1e-10  -seg no  -max_target_seqs 10000  -word_size 5  -gapextend 2  -db_gencode " + to_string (gencode) 
 			    //+ "  -task tblastn-fast  -threshold 100  -window_size 15"  // from amrfinder.cpp: Reduces time by 9% 
 			    //+ "   -num_threads 10  -mt_mode 1"  // Reduces time by 30%
 			      + " " + blast_fmt + " -out " + blastOut + " > /dev/null 2> " + tmp + "/blast-err", tmp + "/blast-err");
-		#endif
 		}
 
 
