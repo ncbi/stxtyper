@@ -1918,6 +1918,7 @@ void Root::saveFile (const string &fName) const
 
 
 
+#if 0
 void Root::trace (ostream& os,
                   const string& title) const
 { 
@@ -1927,6 +1928,7 @@ void Root::trace (ostream& os,
   os << title << ": ";
   saveText (os);
 }
+#endif
 
 
 
