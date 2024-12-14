@@ -32,10 +32,11 @@
 * Dependencies: NCBI BLAST, gunzip (optional)
 *
 * Release changes:
+*  1.0.30 12/14/2024          Bug in --debug
 *                    PD-5191  strong operons should not be partial
 *                             --threads: reduces time by 30% for large input DNA
 *                             Bug in frame shifts detection (for multiple frame shifts in the same protein)
-*  1.0.29 12/12/2024 PD-5192  Only operons with >= 80% identity are reported   // Only BLAST HSPs with identity >= 80% are considered
+*  1.0.29 12/13/2024 PD-5192  Only operons with >= 80% identity are reported   // Only BLAST HSPs with identity >= 80% are considered
 *  1.0.28 12/03/2024          tblastn -gapextend 2
 *         10/30/2024          colorizeDir()
 *  1.0.27 10/23/2024 PD-5155  "Hierarchy node" with mixed types is <stx1>::<stx2>
@@ -288,7 +289,7 @@ struct BlastAlignment
   	    QC_ASSERT (refEnd - refStart <= length);	    
   	  }
       QC_ASSERT (! targetName. empty ());
-      QC_ASSERT (between<size_t> (frame, 1, 3));
+      QC_ASSERT (between<size_t> (frame, 1, 3 + 1));
       QC_ASSERT (contains (stxClass2identity, stxClass));
       QC_ASSERT (isLeft (stxType, stxClass));
       QC_ASSERT (subunit == 'A' || subunit == 'B');
@@ -515,7 +516,7 @@ struct Operon
   const BlastAlignment* al1 {nullptr};
     // !nullptr
   const BlastAlignment* al2 {nullptr};
-  // al1->targetEnd < al2->targetStart
+  // al1->targetEnd <= al2->targetStart
   
 
   Operon () = default;
@@ -538,7 +539,7 @@ struct Operon
       al2->qc ();
       QC_ASSERT (al1->targetName   == al2->targetName);
       QC_ASSERT (al1->targetStrand == al2->targetStrand);
-      QC_ASSERT (al1->targetEnd    <  al2->targetStart);
+      QC_ASSERT (al1->targetEnd    <= al2->targetStart);
       QC_ASSERT (al1->subunit      != al2->subunit);
       QC_ASSERT (al2->reported);
     }
