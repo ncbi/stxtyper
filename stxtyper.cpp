@@ -32,6 +32,8 @@
 * Dependencies: NCBI BLAST, gunzip (optional)
 *
 * Release changes:
+*  1.0.31 12/17/2024 PD-5181  COMPLETE and COMPLETE_NOVEL is preferred over the other operon types
+*                             operons with higher identity and higher coverage are preferred
 *  1.0.30 12/14/2024          Bug in --debug
 *                    PD-5191  strong operons should not be partial
 *                             --threads: reduces time by 30% for large input DNA
@@ -120,8 +122,10 @@ bool print_node = false;
 map<string,double> stxClass2identity;
 
 // PAR
-constexpr size_t intergenic_max {36};  // Max. intergenic region in the reference set + 2
+// bp
+constexpr size_t intergenic_max {36};  // = max. intergenic region in the reference set + 2
 constexpr size_t slack = 30;  
+//
 constexpr double identity_min = 0.8;  // PD-5192
 
 const string stxS ("stx");
@@ -310,18 +314,18 @@ struct BlastAlignment
     { if (! td. live ())
         return;
       const string stxType_reported (verboseP ? getGenesymbol () : (stxS + stxType. substr (0, 1)));
-      const string operon (frameshift 
-                             ? "FRAMESHIFT"
-                             : stopCodon 
-                               ? "INTERNAL_STOP"
-                               : truncated () || otherTruncated ()
-                                 ? "PARTIAL_CONTIG_END"
-                                 : verboseP && getRelCoverage () == 1.0
-                                   ? "COMPLETE_SUBUNIT"
-                                   : getExtended ()
-                                     ? "EXTENDED"
-                                     : "PARTIAL"
-                          );
+      const string quality (frameshift 
+                              ? "FRAMESHIFT"
+                              : stopCodon 
+                                ? "INTERNAL_STOP"
+                                : truncated () || otherTruncated ()
+                                  ? "PARTIAL_CONTIG_END"
+                                  : verboseP && getRelCoverage () == 1.0
+                                    ? "COMPLETE_SUBUNIT"
+                                    : c_extended ()
+                                      ? "EXTENDED"
+                                      : "PARTIAL"
+                           );
       const char strand (targetStrand ? '+' : '-');
       const double refCoverage = getRelCoverage () * 100.0;
       const double refIdentity = getIdentity ()    * 100.0; 
@@ -339,13 +343,13 @@ struct BlastAlignment
            << targetEnd        // 4 "Stop"
            << strand           // 5 "Strand"
            << stxType_reported + "_operon" // 6 "Element symbol"
-           << stxType_reported_operon2elementName (stxType_reported, operon)    // 7 "Element name"
+           << stxType_reported_operon2elementName (stxType_reported, quality)    // 7 "Element name"
            << "plus"           // 8 "Scope"
            << "VIRULENCE"      // 9 "Element type"
            << "STX_TYPE"       //10 "Element subtype"
            << subclass. substr (0, 4)   //11 "Class"
            << subclass         //12 "Subclass"
-           << operon           //13 "Method"  
+           << quality          //13 "Method"  
            << targetEnd - targetStart /*targetAlign*/      //14 "Target length" 
            << noString /*refLen*/  //15 "Reference sequence length"
            << noString /*refCoverage*/      //16 "% Coverage of reference sequence"
@@ -363,7 +367,7 @@ struct BlastAlignment
       {
         td << targetName
            << stxType_reported
-           << operon
+           << quality
            << noString
            << targetStart + 1
            << targetEnd
@@ -419,8 +423,10 @@ struct BlastAlignment
     { return refEnd - refStart; }
   double getRelCoverage () const 
     { return (double) getAbsCoverage () / (double) refLen; }
+#if 0
   size_t getDiff () const
     { return refStart + (refLen - refEnd) + (length - nident); }
+#endif
   bool truncated () const
     { return    (targetStart           <= 3 /*Locus::end_delta*/ && ((targetStrand && refStart)            || (! targetStrand && refEnd + 1 < refLen)))
              || (targetLen - targetEnd <= 3 /*Locus::end_delta*/ && ((targetStrand && refEnd + 1 < refLen) || (! targetStrand && refStart)));
@@ -430,18 +436,41 @@ struct BlastAlignment
       return    (targetStrand == (subunit == 'B') && targetStart           <= missed_max)
              || (targetStrand == (subunit == 'A') && targetLen - targetEnd <= missed_max);
     }
-  bool getExtended () const  // On C-terminus
-    { ASSERT (! truncated ());
-      return ! refStart && refEnd + 1 == refLen; 
+  bool c_extended () const 
+    {/*if (truncated ())  
+        return false; */
+      return    ! refStart             // N-terminus is complete
+             && refEnd + 1 == refLen;  // "*" (stop codon) is missing
     }
   bool partial () const
     { return    getRelCoverage () < 1.0 
-             && ! getExtended (); 
+           //&& ! c_extended ()
+             ;   
     }
-  bool insideEq (const BlastAlignment &other) const
-    { return    targetStart >= other. targetStart 
-             && targetEnd   <= other. targetEnd;
+  bool perfect () const
+    { return    ! truncated ()
+             && ! partial ()
+             && ! c_extended ()  // redundant
+             && ! frameshift
+             && ! stopCodon;
+    }
+  bool insideEq (const BlastAlignment &other,
+                 size_t slack_arg) const
+    { return    targetStrand            == other. targetStrand
+             && targetStart + slack_arg >= other. targetStart 
+             && targetEnd               <= other. targetEnd + slack_arg;
     }  
+  bool betterEq (const BlastAlignment &other) const
+    // Must agree with sameClassLess()
+    {
+      ASSERT (targetName   == other. targetName);
+      ASSERT (targetStrand == other. targetStrand);
+      ASSERT (stxClass     == other. stxClass);
+      ASSERT (subunit      == other. subunit);
+      return   other. insideEq (*this, 0)
+          //&& other. getDiff () >= getDiff ();
+            && other. getIdentity () <= getIdentity ();
+    }    
   string refMap (size_t len) const
     { QC_ASSERT (refLen <= len);
       string s = string (refStart, '-'); 
@@ -466,8 +495,8 @@ struct BlastAlignment
       LESS_PART (*a, *b, targetEnd);
       return false;
     }
-  static bool sameTypeLess (const BlastAlignment* a,
-                            const BlastAlignment* b) 
+  static bool sameClassLess (const BlastAlignment* a,
+                             const BlastAlignment* b) 
     { ASSERT (a);
       ASSERT (b);
       LESS_PART (*a, *b, reported);
@@ -476,13 +505,16 @@ struct BlastAlignment
       LESS_PART (*a, *b, stxClass);
       LESS_PART (*a, *b, subunit);
       LESS_PART (*a, *b, targetStart);
-      LESS_PART (*a, *b, getDiff ());
-      LESS_PART (*a, *b, refAccession);
+    //LESS_PART (*a, *b, getDiff ());
+      LESS_PART (*b, *a, getIdentity ());  
+      LESS_PART (*b, *a, getRelCoverage ());  
+      // Tie resolution
+      LESS_PART (*a, *b, refAccession);  
       return false;
     }
   static bool less (const BlastAlignment* a,
                     const BlastAlignment* b) 
-    // = sameTypeLess(), but without stxClass
+    // = sameClassLess(), but without stxClass
     { ASSERT (a);
       ASSERT (b);
     //LESS_PART (*a, *b, reported);
@@ -490,8 +522,11 @@ struct BlastAlignment
       LESS_PART (*a, *b, targetStrand);
       LESS_PART (*a, *b, subunit);
       LESS_PART (*a, *b, targetStart);
-      LESS_PART (*a, *b, getDiff ());
-      LESS_PART (*a, *b, refAccession);
+    //LESS_PART (*a, *b, getDiff ());
+      LESS_PART (*b, *a, getIdentity ());  
+      LESS_PART (*b, *a, getRelCoverage ());  
+      // Tie resolution
+      LESS_PART (*a, *b, refAccession);  
       return false;
     }
   static bool reportLess (const BlastAlignment* a,
@@ -501,10 +536,13 @@ struct BlastAlignment
       LESS_PART (*a, *b, reported);
       LESS_PART (*a, *b, targetName);
       LESS_PART (*a, *b, targetStrand);
-      LESS_PART (*b, *a, getAbsCoverage ());
-      LESS_PART (*a, *b, getDiff ());
+    //LESS_PART (*b, *a, getAbsCoverage ()); 
+    //LESS_PART (*a, *b, getDiff ());
+      LESS_PART (*b, *a, getIdentity ());  
+      LESS_PART (*b, *a, getRelCoverage ());  
       LESS_PART (*a, *b, targetStart);
-      LESS_PART (*a, *b, refAccession);
+      // Tie resolution
+      LESS_PART (*a, *b, refAccession);  
       return false;
     }
 };
@@ -555,29 +593,30 @@ struct Operon
         const bool novel =    al1->stxClass != al2->stxClass 
                            || getIdentity () < stxClass2identity [al1->stxClass]
                            || stxType. size () <= 1;
-        const string operonType =    getA () -> frameshift
-                                  || getB () -> frameshift
-                                    ? "FRAMESHIFT"
-                                    :    getA () -> stopCodon 
-                                      || getB () -> stopCodon 
-                                      ? "INTERNAL_STOP"
-                                      :    getA () -> truncated () 
-                                        || getB () -> truncated ()
-                                        ? "PARTIAL_CONTIG_END"
-                                        : partial ()
-                                          ? "PARTIAL"  // Complete ??
-                                          :    getA () -> getExtended ()
-                                            || getB () -> getExtended ()
-                                            ? "EXTENDED"  // Complete ??
-                                            : novel
-                                              ? ambig ()
-                                                ? "AMBIGUOUS"
-                                                : standard + "_NOVEL"
-                                              : standard;
+        const string quality =    al1->frameshift
+                               || al2->frameshift
+                                 ? "FRAMESHIFT"
+                                 :    al1->stopCodon 
+                                   || al2->stopCodon 
+                                   ? "INTERNAL_STOP"
+                                   :    al1->truncated () 
+                                     || al2->truncated ()
+                                     ? "PARTIAL_CONTIG_END"
+                                     :    al1->c_extended ()
+                                       || al2->c_extended ()
+                                       ? "EXTENDED" 
+                                       :    al1->partial ()
+                                         || al2->partial ()
+                                         ? "PARTIAL"  
+                                         : novel
+                                           ? ambig ()
+                                             ? "AMBIGUOUS"
+                                             : standard + "_NOVEL"
+                                           : standard;
         if (! verboseP)
         {
           ASSERT (stxType. size () <= 2);
-          if (operonType == standard)
+          if (quality == standard)
             { ASSERT (stxType. size () == 2); }
           else
             if (stxType. size () == 2)
@@ -609,13 +648,13 @@ struct Operon
              << stop              // 4 "Stop"
              << strand            // 5 "Strand"
              << stxType_reported + "_operon"  // 6 "Element symbol"
-             << stxType_reported_operon2elementName (stxType_reported, operonType)    // 7 "Element name"
+             << stxType_reported_operon2elementName (stxType_reported, quality)    // 7 "Element name"
              << "plus"            // 8 "Scope"
              << "VIRULENCE"       // 9 "Element type"
              << "STX_TYPE"        //10 "Element subtype"
              << subclass. substr (0, 4)   //11 "Class"
              << subclass          //12 "Subclass"
-             << operonType        //13 "Method"  
+             << quality        //13 "Method"  
              << targetAlign       //14 "Target length" 
              << noString /*refLen*/  //15 "Reference sequence length"
              << noString /*refCoverage*/  //16 "% Coverage of reference sequence"
@@ -632,7 +671,7 @@ struct Operon
         else
     	    td << targetName
              << stxType_reported
-             << operonType
+             << quality
              << refIdentity
              << start
              << stop
@@ -654,11 +693,11 @@ struct Operon
     }
 
 
-private:
   const BlastAlignment* getA () const
     { return al1->targetStrand ? al1 : al2; }
   const BlastAlignment* getB () const
     { return al1->targetStrand ? al2 : al1; }
+private:
   bool hasAl2 () const
     { return al2; }
   string getRefAccession2 () const
@@ -700,27 +739,51 @@ private:
       return "2";
     }
   bool ambig () const
-    { return    getA () -> ambig ()
-             || getB () -> ambig ();
+    { ASSERT (al2);
+      return    al1->ambig ()
+             || al2->ambig ();
     }
 public:
   double getIdentity () const
-    { return double (al1->nident + al2->nident) / double (al1->length/*refLen*/ + al2->length/*refLen*/); }
-  bool partial () const
-    { return    getA () -> partial ()
-             || getB () -> partial ();
+    { ASSERT (al2);
+      return double (al1->nident + al2->nident) / double (al1->length + al2->length); 
     }
-  bool insideEq (const Operon &other) const
-    { return    al1->targetStrand        == other. al1->targetStrand
-    	       && al1->targetStart + slack >= other. al1->targetStart 
-             && al2->targetEnd           <= other. al2->targetEnd + slack;
+  double getRelCoverage () const 
+    { ASSERT (al2);
+      return double (al1->getAbsCoverage () + al2->getAbsCoverage ()) / double (al1->refLen + al2->refLen); 
+    }
+  bool perfect () const
+    { ASSERT (al2);
+      return    al1->perfect ()
+             && al2->perfect ();
+    }
+  bool insideEq (const Operon &other,
+                 size_t slack_arg) const
+    { ASSERT (al2);
+      return    al1->targetStrand            == other. al1->targetStrand
+    	       && al1->targetStart + slack_arg >= other. al1->targetStart 
+             && al2->targetEnd               <= other. al2->targetEnd + slack_arg;
+    }
+  bool betterEq (const Operon &other) const
+    {  if (al1->targetName != other. al1->targetName)
+         return false;
+       if (! other. insideEq (*this, 3 * slack))  // PAR
+         return false;
+       if (perfect () > other. perfect ())
+         return true;
+       if (perfect () < other. perfect ())
+         return false;
+       return getIdentity () >= other. getIdentity ();
     }
   bool operator< (const Operon &other) const
-    { LESS_PART (*this, other, al1->targetName);
+    // Ordering by quality
+    { ASSERT (al2);
+      LESS_PART (*this, other, al1->targetName);
+      LESS_PART (other, *this, perfect ());
       LESS_PART (other, *this, getIdentity ());
-      LESS_PART (*this, other, hasAl2 ());
+      LESS_PART (other, *this, getRelCoverage ());
+      // Tie resolution
       LESS_PART (*this, other, al1->refAccession);
-      LESS_PART (*this, other, hasAl2 ());
       LESS_PART (*this, other, getRefAccession2 ());
       return false;
     }
@@ -730,8 +793,9 @@ public:
       LESS_PART (a, b, al1->targetStart);
       LESS_PART (a, b, al1->targetEnd);
       LESS_PART (b, a, al1->targetStrand);
-      LESS_PART (a, b, al1->refAccession);
       LESS_PART (a, b, hasAl2 ());
+      // Tie resolution
+      LESS_PART (a, b, al1->refAccession);
       LESS_PART (a, b, getRefAccession2 ());
       return false;
     }
@@ -795,23 +859,16 @@ void goodBlasts2operons (const VectorPtr<BlastAlignment> &goodBlastAls,
         if (   ! strong 
             || (   op. getIdentity () >= stxClass2identity [op. al1->stxClass]
                 && op. getIdentity () >= stxClass2identity [op. al2->stxClass]
-                && ! op. al1->truncated ()
-                && ! op. al2->truncated ()
-                && ! op. partial ()  // PD-5191
+                && op. perfect ()
                )
            )
-        {
           operons << std::move (op);
-          var_cast (al1) -> reported = true;
-          var_cast (al2) -> reported = true;
-        }
       }
     }
   }
   
   LOG ("# Operons: " + to_string (operons. size ()));
   LOG ("\nSuppress goodBlastAls by operons");
-
   for (const BlastAlignment* al : goodBlastAls)
   {
     ASSERT (al);
@@ -830,6 +887,15 @@ void goodBlasts2operons (const VectorPtr<BlastAlignment> &goodBlastAls,
         }
       }
   }
+  
+  if (qc_on)
+    for (const Operon& op : operons)
+    {
+      ASSERT (op. al1);
+      ASSERT (op. al2);
+      ASSERT (op. al1->reported);
+      ASSERT (op. al2->reported);
+    }    
 }
 
 
@@ -849,6 +915,7 @@ struct ThisApplication final : ShellApplication
     	addFlag ("amrfinder", "Print output in the nucleotide AMRFinderPlus format");
     	addFlag ("print_node", "Print AMRFinderPlus hierarchy node");
       addKey ("nucleotide_output", "Output nucleotide FASTA file of reported nucleotide sequences", "", '\0', "NUC_FASTA_OUT");
+        // Flag: only for COMPLETE_NOVEL ??
 
       version = SVN_REV;
     }
@@ -864,7 +931,7 @@ struct ThisApplication final : ShellApplication
           string blast_bin  =             getArg ("blast_bin");
                  amrfinder  =             getFlag ("amrfinder");
                  print_node =             getFlag ("print_node");
-    const string  dna_out   = shellQuote (getArg ("nucleotide_output"));
+    const string dna_out    = shellQuote (getArg ("nucleotide_output"));
     
     if (contains (input_name, '\t'))
       throw runtime_error ("NAME cannot contain a tab character");
@@ -943,6 +1010,7 @@ struct ThisApplication final : ShellApplication
     OFStream fOut (tmpOut);
     TsvOut td (& fOut, 2, false);
     TsvOut logTd (logPtr, 2, false);
+    logTd. usePound = false;
 
     
     if (! input_name. empty ())
@@ -1036,9 +1104,9 @@ struct ThisApplication final : ShellApplication
     }
     
     LOG ("All blasts:");
-	  VectorPtr<BlastAlignment> goodBlastAls;   
+	  VectorPtr<BlastAlignment> goodBlastAls;   // Pareto-best
 	  {
-      blastAls. sort (BlastAlignment::sameTypeLess);
+      blastAls. sort (BlastAlignment::sameClassLess);
 	    size_t start = 0;
       FFOR (size_t, i, blastAls. size ())
       {
@@ -1053,6 +1121,7 @@ struct ThisApplication final : ShellApplication
                     )
               )
           start++;
+        ASSERT (start <= i);
         if (al->reported)
           break; 
         al->saveTsvOut (logTd, true);
@@ -1062,13 +1131,8 @@ struct ThisApplication final : ShellApplication
           const BlastAlignment* prev = blastAls [j];
           ASSERT (prev);
           ASSERT (! prev->reported);
-          ASSERT (al->targetName   == prev->targetName);
-          ASSERT (al->targetStrand == prev->targetStrand);
-          ASSERT (al->stxClass     == prev->stxClass);
-          ASSERT (al->subunit      == prev->subunit);
-          if (   al->insideEq (*prev)
-              && al->getDiff () >= prev->getDiff ()
-            //&& al->getIdentity () <= prev-> getIdentity ()
+          if (   prev->betterEq (*al)
+              && ! al->betterEq (*prev)
              )
           {
             suppress = true;
@@ -1103,17 +1167,24 @@ struct ThisApplication final : ShellApplication
        	op. qc ();     
        	if (op. getIdentity () < identity_min)
        	  continue;
-        bool found = false;
+        bool betterFound = false;
         for (const Operon& goodOp : goodOperons)
-          if (   op. al1->targetName == goodOp. al1->targetName
-              && op. insideEq (goodOp)
-              && goodOp. getIdentity () >= op. getIdentity ()
-             )
+          if (goodOp. betterEq (op))
+          #if 0
+            if (   ! op. betterEq (goodOp)
+                || ! (   goodOp. perfect ()
+                      && op.     perfect ()
+                     )
+                || (   goodOp. getA () -> stxClass == op. getA () -> stxClass
+                    && goodOp. getB () -> stxClass == op. getB () -> stxClass
+                   )
+               )
+          #endif
           {
-            found = true;
+            betterFound = true;
             break;
           }
-        if (! found)
+        if (! betterFound)
           goodOperons << op;          
       }      
     }
@@ -1143,9 +1214,9 @@ struct ThisApplication final : ShellApplication
           ASSERT (al->targetName   == prev->targetName);
           ASSERT (al->targetStrand == prev->targetStrand);
           ASSERT (al->subunit      == prev->subunit);
-          if (   al->insideEq (*prev)
-              && al->getDiff () >= prev->getDiff ()
-            //&& al->getIdentity () <= prev-> getIdentity ()
+          if (   al->insideEq (*prev, 0)
+            //&& al->getDiff () >= prev->getDiff ()
+              && al->getIdentity () <= prev->getIdentity ()  
              )
           {
             var_cast (al) -> reported = true;
@@ -1176,11 +1247,12 @@ struct ThisApplication final : ShellApplication
               )
            )
           break;
+        // Use Operon::betterEq() ??!
         if (   ! al2->reported
-            && al2->insideEq (*al1)
+            && al2->insideEq (*al1, 3 * slack)  // PAR
             && (   al2->stxType [0] == al1->stxType [0] 
-                || al2->getDiff () >= al1->getDiff ()
-              //|| al1->getIdentity () >= al2->getIdentity ()
+              //|| al2->getDiff () >= al1->getDiff ()
+                || al1->getIdentity () >= al2->getIdentity ()  
                )
            )
           var_cast (al2) -> reported = true;
