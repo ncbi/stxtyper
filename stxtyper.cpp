@@ -32,6 +32,7 @@
 * Dependencies: NCBI BLAST, gunzip (optional)
 *
 * Release changes:
+*  1.0.32 12/20/2024 PD-5201  Change empty fields to NA
 *  1.0.31 12/17/2024 PD-5181  COMPLETE and COMPLETE_NOVEL is preferred over the other operon types
 *                             operons with higher identity and higher coverage are preferred
 *  1.0.30 12/14/2024          Bug in --debug
@@ -129,7 +130,7 @@ constexpr size_t slack = 30;
 constexpr double identity_min = 0.8;  // PD-5192
 
 const string stxS ("stx");
-const string na ("NA");
+//const string na ("NA");
 
 
 
@@ -351,8 +352,8 @@ struct BlastAlignment
            << subclass         //12 "Subclass"
            << quality          //13 "Method"  
            << targetEnd - targetStart /*targetAlign*/      //14 "Target length" 
-           << noString /*refLen*/  //15 "Reference sequence length"
-           << noString /*refCoverage*/      //16 "% Coverage of reference sequence"
+           << na /*refLen*/  //15 "Reference sequence length"
+           << na /*refCoverage*/      //16 "% Coverage of reference sequence"
            << refIdentity      //17 "% Identity to reference sequence"
            << length           //18 "Alignment length"
            << refAccession     //19 "Accession of closest sequence"
@@ -368,24 +369,24 @@ struct BlastAlignment
         td << targetName
            << stxType_reported
            << quality
-           << noString
+           << na
            << targetStart + 1
            << targetEnd
            << strand;
         if (subunit == 'B')
-          td << noString
-             << noString
-             << noString
-             << noString;
+          td << na
+             << na
+             << na
+             << na;
         td << refAccession
            << subClass
            << refIdentity
            << refCoverage;
         if (subunit == 'A')
-          td << noString
-             << noString
-             << noString
-             << noString;
+          td << na
+             << na
+             << na
+             << na;
       }
       td. newLn ();
     }
@@ -608,6 +609,7 @@ struct Operon
                                        :    al1->partial ()
                                          || al2->partial ()
                                          ? "PARTIAL"  
+                                         // complete operon types
                                          : novel
                                            ? ambig ()
                                              ? "AMBIGUOUS"
@@ -656,8 +658,8 @@ struct Operon
              << subclass          //12 "Subclass"
              << quality        //13 "Method"  
              << targetAlign       //14 "Target length" 
-             << noString /*refLen*/  //15 "Reference sequence length"
-             << noString /*refCoverage*/  //16 "% Coverage of reference sequence"
+             << na /*refLen*/  //15 "Reference sequence length"
+             << na /*refCoverage*/  //16 "% Coverage of reference sequence"
              << refIdentity       //17 "% Identity to reference sequence"
              << alignmentLen      //18 "Alignment length"
              << refAccessions     //19 "Accession of closest sequence"
@@ -945,7 +947,7 @@ struct ThisApplication final : ShellApplication
     stderr << "Version: " << version << '\n'; 
     
 		const string logFName (tmp + "/log"); 
-    const string qcS (qc_on ? " -qc" : "");
+    const string qcS (qc_on ? " -qc" : noString);
 
 
     // blast_bin
