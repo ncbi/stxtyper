@@ -32,6 +32,7 @@
 * Dependencies: NCBI BLAST, gunzip (optional)
 *
 * Release changes:
+*  1.0.34 12/23/2024 PD-5209  Make the AMRFinderPlus columns "Accession of closest sequence" and "Name of closest sequence" to be NA (per PD-4910)
 *  1.0.33 12/23/2024 PD-5205  Replace ", " by "," in the AMRFinderPlus column "Closest reference accession"
 *  1.0.32 12/20/2024 PD-5201  Change empty fields to NA
 *  1.0.31 12/17/2024 PD-5181  COMPLETE and COMPLETE_NOVEL is preferred over the other operon types
@@ -636,14 +637,14 @@ struct Operon
   	      td << input_name;
         if (amrfinder)
         {
-          const string genesymbol (al1->stxType == al2->stxType ? stxS + al1->stxType : stxType_reported);
+        //const string genesymbol (al1->stxType == al2->stxType ? stxS + al1->stxType : stxType_reported);
           string subclass (stxType_reported /*genesymbol*/);
           strUpper (subclass);
           const size_t targetAlign = al2->targetEnd - al1->targetStart;
         //const size_t refLen = al1->refLen + al2->refLen;
         //const double refCoverage = double (al1->getAbsCoverage () + al2->getAbsCoverage ()) / double (refLen) * 100.0;
           const size_t alignmentLen = al1->length + al2->length;
-          const string refAccessions (al1->refAccession + "," + al2->refAccession);  // No space: PD-5205
+        //const string refAccessions (al1->refAccession + "," + al2->refAccession);  // No space: PD-5205
           const string fam (al1->getGenesymbol () + fusion_infix + al2->getGenesymbol ());
           td << na                // 1 "Protein identifier"  
              << targetName        // 2 "Contig id"
@@ -663,8 +664,8 @@ struct Operon
              << na /*refCoverage*/  //16 "% Coverage of reference sequence"
              << refIdentity       //17 "% Identity to reference sequence"
              << alignmentLen      //18 "Alignment length"
-             << refAccessions     //19 "Accession of closest sequence"
-             << "Shiga toxin " + genesymbol //20 "Name of closest sequence"
+             << na /*refAccessions*/     //19 "Accession of closest sequence"
+             << na /*"Shiga toxin " + genesymbol*/ //20 "Name of closest sequence"
              << na                //21 "HMM id"
              << na                //22 "HMM description"
              ;
