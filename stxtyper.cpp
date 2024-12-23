@@ -32,6 +32,7 @@
 * Dependencies: NCBI BLAST, gunzip (optional)
 *
 * Release changes:
+*  1.0.33 12/23/2024 PD-5205  Replace ", " by "," in the AMRFinderPlus column "Closest reference accession"
 *  1.0.32 12/20/2024 PD-5201  Change empty fields to NA
 *  1.0.31 12/17/2024 PD-5181  COMPLETE and COMPLETE_NOVEL is preferred over the other operon types
 *                             operons with higher identity and higher coverage are preferred
@@ -642,7 +643,7 @@ struct Operon
         //const size_t refLen = al1->refLen + al2->refLen;
         //const double refCoverage = double (al1->getAbsCoverage () + al2->getAbsCoverage ()) / double (refLen) * 100.0;
           const size_t alignmentLen = al1->length + al2->length;
-          const string refAccessions (al1->refAccession + ", " + al2->refAccession);
+          const string refAccessions (al1->refAccession + "," + al2->refAccession);  // No space: PD-5205
           const string fam (al1->getGenesymbol () + fusion_infix + al2->getGenesymbol ());
           td << na                // 1 "Protein identifier"  
              << targetName        // 2 "Contig id"
