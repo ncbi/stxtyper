@@ -32,7 +32,8 @@
 * Dependencies: NCBI BLAST, gunzip (optional)
 *
 * Release changes:
-*  1.0.28 01/10/2025 PD-5215  blanks fields -> na; "Closest reference accession" is na for complete operons
+*  1.0.29 01/10/2025 PD-6215  "Name of closest sequence": na for two-subunit operons
+*  1.0.28 01/10/2025 PD-5215  blanks fields -> na; "Closest reference accession" is na for two-subunit operons
 *  branch "gpipe_compat"
 *  1.0.27 10/23/2024 PD-5155  "Hierarchy node" with mixed types is <stx1>::<stx2>
 *  1.0.26 10/22/2024 PD-5085  Change column "Element length" to "Target length"
@@ -603,7 +604,7 @@ struct Operon
              << refIdentity       //17 "% Identity to reference sequence"
              << alignmentLen      //18 "Alignment length"
              << na /*refAccessions*/     //19 "Accession of closest sequence"
-             << "Shiga toxin " + genesymbol //20 "Name of closest sequence"
+             << na /*"Shiga toxin " + genesymbol*/ //20 "Name of closest sequence"
              << na                //21 "HMM id"
              << na                //22 "HMM description"
              ;
