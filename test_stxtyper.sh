@@ -58,7 +58,7 @@ function test_input_file {
 
     TESTS=$(( $TESTS + 1 ))
 
-    if ! $STXTYPER $options -n "test/$test_base.fa" --debug  > "test/$test_base.got"
+    if ! $STXTYPER $options -n "test/$test_base.fa" > "test/$test_base.got"
     then
         echo "${red}not ok: $STXTYPER returned a non-zero exit value indicating a failure of the software${reset}"
         echo "#  $STXTYPER $options -n test/$test_base.fa > test/$test_base.got"
