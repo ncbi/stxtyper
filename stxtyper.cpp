@@ -32,6 +32,7 @@
 * Dependencies: NCBI BLAST, gunzip (optional)
 *
 * Release changes:
+*  1.0.30 01/14/2025 PD-5215  "Closest reference accession" field should have two accessions separated by "," for two-subunit operons
 *  1.0.29 01/10/2025 PD-6215  "Name of closest sequence": na for two-subunit operons
 *  1.0.28 01/10/2025 PD-5215  blanks fields -> na; "Closest reference accession" is na for two-subunit operons
 *  branch "gpipe_compat"
@@ -583,7 +584,7 @@ struct Operon
         //const size_t refLen = al1->refLen + al2->refLen;
         //const double refCoverage = double (al1->getAbsCoverage () + al2->getAbsCoverage ()) / double (refLen) * 100.0;
           const size_t alignmentLen = al1->length + al2->length;
-        //const string refAccessions (al1->refAccession + ", " + al2->refAccession);
+          const string refAccessions (al1->refAccession + "," + al2->refAccession);
           const string fam (al1->getGenesymbol () + fusion_infix + al2->getGenesymbol ());
           td << na                // 1 "Protein identifier"  
              << targetName        // 2 "Contig id"
@@ -603,7 +604,7 @@ struct Operon
              << na /*refCoverage*/  //16 "% Coverage of reference sequence"
              << refIdentity       //17 "% Identity to reference sequence"
              << alignmentLen      //18 "Alignment length"
-             << na /*refAccessions*/     //19 "Accession of closest sequence"
+             << refAccessions     //19 "Accession of closest sequence"
              << na /*"Shiga toxin " + genesymbol*/ //20 "Name of closest sequence"
              << na                //21 "HMM id"
              << na                //22 "HMM description"
