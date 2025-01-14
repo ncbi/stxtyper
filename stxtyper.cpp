@@ -32,6 +32,7 @@
 * Dependencies: NCBI BLAST, gunzip (optional)
 *
 * Release changes:
+*  1.0.31 01/14/2025 PD-5215  "re-enable reporting Name of closest sequence"
 *  1.0.30 01/14/2025 PD-5215  "Closest reference accession" field should have two accessions separated by "," for two-subunit operons
 *  1.0.29 01/10/2025 PD-6215  "Name of closest sequence": na for two-subunit operons
 *  1.0.28 01/10/2025 PD-5215  blanks fields -> na; "Closest reference accession" is na for two-subunit operons
@@ -605,7 +606,7 @@ struct Operon
              << refIdentity       //17 "% Identity to reference sequence"
              << alignmentLen      //18 "Alignment length"
              << refAccessions     //19 "Accession of closest sequence"
-             << na /*"Shiga toxin " + genesymbol*/ //20 "Name of closest sequence"
+             << "Shiga toxin " + genesymbol //20 "Name of closest sequence"
              << na                //21 "HMM id"
              << na                //22 "HMM description"
              ;
