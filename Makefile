@@ -62,7 +62,7 @@ ifeq ($(ARCH),aarch64)
   CPPFLAGS = -std=gnu++17 -pthread --signed-char -falign-jumps -fno-math-errno -O3 
 else
   # set x86_x64 CFLAGS
-  CPPFLAGS = -std=gnu++17 -pthread -malign-double -fno-math-errno -O3
+  CPPFLAGS = -std=gnu++17 -pthread -malign-double -fno-math-errno -O3 -static-libstdc++
 endif
 # was: -std=gnu++14 
 
@@ -70,7 +70,7 @@ CXX=g++
 COMPILE.cpp= $(CXX) $(CPPFLAGS) $(SVNREV) $(DBDIR) -c 
 
 
-.PHONY: all clean install release test
+.PHONY: all clean install release test binary_dist
 
 BINARIES= stxtyper fasta_check fasta_extract
 DATABASE= stx.prot
@@ -119,7 +119,7 @@ install:
 # stxtyper binaries for github binary release
 GITHUB_FILE=stxtyper_v$(VERSION_STRING)_$(ARCH)_$(OS)
 GITHUB_FILES = $(BINARIES) $(DATABASE) version.txt test_stxtyper.sh
-binary_dist:
+binary_dist: 
 	@if [ ! -e version.txt ]; \
 	then \
 		echo >&2 "version.txt required to make a distribution file"; \
