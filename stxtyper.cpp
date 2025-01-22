@@ -32,6 +32,11 @@
 * Dependencies: NCBI BLAST, gunzip (optional)
 *
 * Release changes:
+*  1.0.31 01/14/2025 PD-5215  "re-enable reporting Name of closest sequence"
+*  1.0.30 01/14/2025 PD-5215  "Closest reference accession" field should have two accessions separated by "," for two-subunit operons
+*  1.0.29 01/10/2025 PD-6215  "Name of closest sequence": na for two-subunit operons
+*  1.0.28 01/10/2025 PD-5215  blanks fields -> na; "Closest reference accession" is na for two-subunit operons
+*  branch "gpipe_compat"
 *  1.0.27 10/23/2024 PD-5155  "Hierarchy node" with mixed types is <stx1>::<stx2>
 *  1.0.26 10/22/2024 PD-5085  Change column "Element length" to "Target length"
 *  1.0.25 08/16/2024 PD-5085  AMRFinderPlus column names to match MicroBIGG-E
@@ -117,7 +122,6 @@ constexpr size_t intergenic_max {36};  // Max. intergenic region in the referenc
 constexpr size_t slack = 30;  
 
 const string stxS ("stx");
-const string na ("NA");
 
 
 
@@ -331,8 +335,8 @@ struct BlastAlignment
            << subclass         //12 "Subclass"
            << operon           //13 "Method"  
            << targetEnd - targetStart /*targetAlign*/      //14 "Target length" 
-           << noString /*refLen*/  //15 "Reference sequence length"
-           << noString /*refCoverage*/      //16 "% Coverage of reference sequence"
+           << na /*refLen*/    //15 "Reference sequence length"
+           << na /*refCoverage*/  //16 "% Coverage of reference sequence"
            << refIdentity      //17 "% Identity to reference sequence"
            << length           //18 "Alignment length"
            << refAccession     //19 "Accession of closest sequence"
@@ -348,24 +352,24 @@ struct BlastAlignment
         td << targetName
            << stxType_reported
            << operon
-           << noString
+           << na
            << targetStart + 1
            << targetEnd
            << strand;
         if (subunit == 'B')
-          td << noString
-             << noString
-             << noString
-             << noString;
+          td << na
+             << na
+             << na
+             << na;
         td << refAccession
            << subClass
            << refIdentity
            << refCoverage;
         if (subunit == 'A')
-          td << noString
-             << noString
-             << noString
-             << noString;
+          td << na
+             << na
+             << na
+             << na;
       }
       td. newLn ();
     }
@@ -519,7 +523,7 @@ struct Operon
       al2->qc ();
       QC_ASSERT (al1->targetName   == al2->targetName);
       QC_ASSERT (al1->targetStrand == al2->targetStrand);
-      QC_ASSERT (al1->targetEnd    <  al2->targetStart);
+      QC_ASSERT (al1->targetEnd    <= al2->targetStart);
       QC_ASSERT (al1->subunit      != al2->subunit);
       QC_ASSERT (al2->reported);
     }
@@ -581,7 +585,7 @@ struct Operon
         //const size_t refLen = al1->refLen + al2->refLen;
         //const double refCoverage = double (al1->getAbsCoverage () + al2->getAbsCoverage ()) / double (refLen) * 100.0;
           const size_t alignmentLen = al1->length + al2->length;
-          const string refAccessions (al1->refAccession + ", " + al2->refAccession);
+          const string refAccessions (al1->refAccession + "," + al2->refAccession);
           const string fam (al1->getGenesymbol () + fusion_infix + al2->getGenesymbol ());
           td << na                // 1 "Protein identifier"  
              << targetName        // 2 "Contig id"
@@ -597,8 +601,8 @@ struct Operon
              << subclass          //12 "Subclass"
              << operonType        //13 "Method"  
              << targetAlign       //14 "Target length" 
-             << noString /*refLen*/  //15 "Reference sequence length"
-             << noString /*refCoverage*/  //16 "% Coverage of reference sequence"
+             << na /*refLen*/  //15 "Reference sequence length"
+             << na /*refCoverage*/  //16 "% Coverage of reference sequence"
              << refIdentity       //17 "% Identity to reference sequence"
              << alignmentLen      //18 "Alignment length"
              << refAccessions     //19 "Accession of closest sequence"
