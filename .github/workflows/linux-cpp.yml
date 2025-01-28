@@ -5,9 +5,31 @@ on:
   push:
 
 jobs:
-  build:
-
+  x86_linux:
     runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: prerequisites
+      run: |
+          sudo apt-get update
+          sudo apt-get install -y ncbi-blast+
+    - name: make
+      run: make
+    - name: test
+      run: ./test_stxtyper.sh
+    - name: Upload artifacts on failure
+      uses: actions/upload-artifact@v4
+      if: ${{ failure() }} # only run if the job fails
+      with: 
+        name: stxtyper-failed-test-linux
+        path: |
+            ./*
+            test/* 
+        retention-days: 14
+
+  x86_linux_arm:
+    runs-on: ubuntu-24.04-arm
 
     steps:
     - uses: actions/checkout@v4
