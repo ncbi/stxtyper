@@ -62,6 +62,8 @@ jobs:
       shell: bash -el {0}
       run: |
           echo CONDA_PREFIX = $CONDA_PREFIX
+          . $CONDA/bin/activate
+          which stxtyper
           bash ./test_stxtyper.sh path
   x86_mac:
     runs-on: macos-13
