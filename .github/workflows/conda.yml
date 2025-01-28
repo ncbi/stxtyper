@@ -35,15 +35,21 @@ jobs:
   arm_linux:
     runs-on: ubuntu-24.04-arm
     steps:
+      # No conda on arm_linux by default, trying a prerolled action
+    - uses: conda-incubator/setup-miniconda@v3
+      with:
+        auto-update-conda: true
     - name: When was this run
       run: date
     - name: configure conda
+      shell: bash -el {0}
       run: |
           . $CONDA/bin/activate
           conda config --add channels defaults
           conda config --add channels bioconda
           conda config --add channels conda-forge
     - name: install StxTyper
+      shell: bash -el {0}
       run: |
           . $CONDA/bin/activate
           conda install --update-deps -c conda-forge -c bioconda --strict-channel-priority -y ncbi-stxtyper
@@ -53,8 +59,8 @@ jobs:
           BASE_URL=https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/master
           curl --silent --location -O ${BASE_URL}/test_stxtyper.sh
     - name: run tests
+      shell: bash -el {0}
       run: |
-          source /usr/share/miniconda/bin/activate
           echo CONDA_PREFIX = $CONDA_PREFIX
           bash ./test_stxtyper.sh path
   x86_mac:
