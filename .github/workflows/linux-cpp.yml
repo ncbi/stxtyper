@@ -30,7 +30,6 @@ jobs:
 
   x86_linux_arm:
     runs-on: ubuntu-24.04-arm
-
     steps:
     - uses: actions/checkout@v4
     - name: prerequisites
