@@ -32,7 +32,11 @@
 * Dependencies: NCBI BLAST, gunzip (optional)
 *
 * Release changes:
-*  1.0.34 12/23/2024 PD-5209  Make the AMRFinderPlus columns "Accession of closest sequence" and "Name of closest sequence" to be NA (per PD-4910)
+*                             BlastAlignment::{positives --> xs}; Xs are not counted as identities
+*  1.0.37 01/29/2025 PD-5198  operin type priorities: ... < PARTIAL_CONTIG_END < PARTIAL < AMBIGUOUS [complete operon] < COMPLETE_NOVEL < COMPLETE
+*  1.0.36 01/14/2025 PD-5215  re-enable reporting "Name of closest sequence" for two-subunit operons
+*  1.0.35 01/14/2025 PD-5215  "Closest reference accession" field has two accessions separated by "," for two-subunit operons
+*  1.0.34 12/23/2024 PD-5209  Make the AMRFinderPlus columns "Closest reference accession" and "Closest reference name" to be NA (per PD-4910)
 *  1.0.33 12/23/2024 PD-5205  Replace ", " by "," in the AMRFinderPlus column "Closest reference accession"
 *  1.0.32 12/20/2024 PD-5201  Change empty fields to NA
 *  1.0.31 12/17/2024 PD-5181  COMPLETE and COMPLETE_NOVEL is preferred over the other operon types
@@ -132,7 +136,6 @@ constexpr size_t slack = 30;
 constexpr double identity_min = 0.8;  // PD-5192
 
 const string stxS ("stx");
-//const string na ("NA");
 
 
 
@@ -158,7 +161,7 @@ string stxType_reported_operon2elementName (const string &stxType_reported,
 
 struct BlastAlignment 
 {
-  size_t length {0}, nident {0}, positives {0}  // aa
+  size_t length {0}, nident {0}, xs {0}  // aa   
        ,    refStart {0},    refEnd {0},    refLen {0}
        , targetStart {0}, targetEnd {0}, targetLen {0};
     // Positions are 0-based
@@ -224,27 +227,18 @@ struct BlastAlignment
       	      
 	    length = targetSeq. size ();
 	    nident = 0;
-	    positives = 0;
+	    xs = 0;
 	    QC_ASSERT (targetSeq. size () == refSeq. size ());
 	    FFOR (size_t, i, targetSeq. size ())
-	      if (targetSeq [i] == refSeq [i])
-	      {
+        if (targetSeq [i] == 'X')
+	        xs++;
+	      else if (targetSeq [i] == refSeq [i])  
 	        nident++;
-	        positives++;
-	      }
-	      else
-	        if (   targetSeq [i] == 'X'
-	            || refSeq    [i] == 'X'
-	           )
-  	        positives++;
 	    if (   refStart == 0 
 	        && charInSet (targetSeq [0], "LIV") 
 	        && refSeq [0] == 'M'
 	       )
-	    {
 	      nident++;
-	      positives++;
-	    }
 
       stxClass = stxType;
       if (   stxType == "2a"
@@ -283,16 +277,14 @@ struct BlastAlignment
         return;
       QC_ASSERT (length);
       QC_ASSERT (nident);
-      QC_ASSERT (nident <= positives);
-    //QC_ASSERT (nident <= length);
-      QC_ASSERT (positives <= length);
+      QC_ASSERT (nident + xs <= length);
 	    QC_ASSERT (targetStart < targetEnd);
 	    QC_ASSERT (targetEnd <= targetLen);
       QC_ASSERT (refStart < refEnd);
 	    QC_ASSERT (refEnd <= refLen);
 	    if (! frameshift)
 	    {
-  	    QC_ASSERT (positives <= refEnd - refStart);
+  	    QC_ASSERT (nident + xs <= refEnd - refStart);
   	    QC_ASSERT (refEnd - refStart <= length);	    
   	  }
       QC_ASSERT (! targetName. empty ());
@@ -317,6 +309,20 @@ struct BlastAlignment
     { if (! td. live ())
         return;
       const string stxType_reported (verboseP ? getGenesymbol () : (stxS + stxType. substr (0, 1)));
+    #if 1
+      const string quality (frameshift 
+                              ? "FRAMESHIFT"
+                              : stopCodon 
+                                ? "INTERNAL_STOP"
+                                : verboseP && getRelCoverage () == 1.0
+                                  ? "COMPLETE_SUBUNIT"
+                                  : c_extended ()
+                                    ? "EXTENDED"
+                                    : truncated () || otherTruncated ()
+                                      ? "PARTIAL_CONTIG_END"
+                                      : "PARTIAL"
+                           );
+    #else
       const string quality (frameshift 
                               ? "FRAMESHIFT"
                               : stopCodon 
@@ -329,6 +335,7 @@ struct BlastAlignment
                                       ? "EXTENDED"
                                       : "PARTIAL"
                            );
+    #endif
       const char strand (targetStrand ? '+' : '-');
       const double refCoverage = getRelCoverage () * 100.0;
       const double refIdentity = getIdentity ()    * 100.0; 
@@ -411,9 +418,9 @@ struct BlastAlignment
       //refEnd = prev. refEnd;
         maximize (refEnd, prev. refEnd);
       // Approximately
-      length      += prev. length;  
-      nident      += prev. nident;  
-      positives   += prev. positives;
+      length += prev. length;  
+      nident += prev. nident;  
+      xs     += prev. xs;
     //targetAlign += prev. targetAlign;
       //
       if (prev. stopCodon)
@@ -426,10 +433,6 @@ struct BlastAlignment
     { return refEnd - refStart; }
   double getRelCoverage () const 
     { return (double) getAbsCoverage () / (double) refLen; }
-#if 0
-  size_t getDiff () const
-    { return refStart + (refLen - refEnd) + (length - nident); }
-#endif
   bool truncated () const
     { return    (targetStart           <= 3 /*Locus::end_delta*/ && ((targetStrand && refStart)            || (! targetStrand && refEnd + 1 < refLen)))
              || (targetLen - targetEnd <= 3 /*Locus::end_delta*/ && ((targetStrand && refEnd + 1 < refLen) || (! targetStrand && refStart)));
@@ -471,7 +474,6 @@ struct BlastAlignment
       ASSERT (stxClass     == other. stxClass);
       ASSERT (subunit      == other. subunit);
       return   other. insideEq (*this, 0)
-          //&& other. getDiff () >= getDiff ();
             && other. getIdentity () <= getIdentity ();
     }    
   string refMap (size_t len) const
@@ -483,8 +485,6 @@ struct BlastAlignment
       s += string (len - refEnd, '-'); 
       return s;
     }
-  bool ambig () const
-    { return nident < positives; }
   static bool frameshiftLess (const BlastAlignment* a,
                               const BlastAlignment* b)
     { ASSERT (a);
@@ -508,7 +508,6 @@ struct BlastAlignment
       LESS_PART (*a, *b, stxClass);
       LESS_PART (*a, *b, subunit);
       LESS_PART (*a, *b, targetStart);
-    //LESS_PART (*a, *b, getDiff ());
       LESS_PART (*b, *a, getIdentity ());  
       LESS_PART (*b, *a, getRelCoverage ());  
       // Tie resolution
@@ -525,7 +524,6 @@ struct BlastAlignment
       LESS_PART (*a, *b, targetStrand);
       LESS_PART (*a, *b, subunit);
       LESS_PART (*a, *b, targetStart);
-    //LESS_PART (*a, *b, getDiff ());
       LESS_PART (*b, *a, getIdentity ());  
       LESS_PART (*b, *a, getRelCoverage ());  
       // Tie resolution
@@ -540,7 +538,6 @@ struct BlastAlignment
       LESS_PART (*a, *b, targetName);
       LESS_PART (*a, *b, targetStrand);
     //LESS_PART (*b, *a, getAbsCoverage ()); 
-    //LESS_PART (*a, *b, getDiff ());
       LESS_PART (*b, *a, getIdentity ());  
       LESS_PART (*b, *a, getRelCoverage ());  
       LESS_PART (*a, *b, targetStart);
@@ -596,6 +593,29 @@ struct Operon
         const bool novel =    al1->stxClass != al2->stxClass 
                            || getIdentity () < stxClass2identity [al1->stxClass]
                            || stxType. size () <= 1;
+      #if 1
+        const string quality =    al1->frameshift
+                               || al2->frameshift
+                                 ? "FRAMESHIFT"
+                                 :    al1->stopCodon 
+                                   || al2->stopCodon 
+                                     ? "INTERNAL_STOP"
+                                     :    al1->c_extended ()
+                                       || al2->c_extended ()
+                                         ? "EXTENDED" 
+                                         :    al1->truncated () 
+                                           || al2->truncated ()
+                                             ? "PARTIAL_CONTIG_END"
+                                             :    al1->partial ()
+                                               || al2->partial ()
+                                               ? "PARTIAL"  
+                                             // complete operon types
+                                               : novel
+                                                 ? xs ()
+                                                   ? "AMBIGUOUS"
+                                                   : standard + "_NOVEL"
+                                                 : standard;
+      #else
         const string quality =    al1->frameshift
                                || al2->frameshift
                                  ? "FRAMESHIFT"
@@ -613,10 +633,11 @@ struct Operon
                                          ? "PARTIAL"  
                                          // complete operon types
                                          : novel
-                                           ? ambig ()
+                                           ? xs ()
                                              ? "AMBIGUOUS"
                                              : standard + "_NOVEL"
                                            : standard;
+      #endif
         if (! verboseP)
         {
           ASSERT (stxType. size () <= 2);
@@ -637,14 +658,14 @@ struct Operon
   	      td << input_name;
         if (amrfinder)
         {
-        //const string genesymbol (al1->stxType == al2->stxType ? stxS + al1->stxType : stxType_reported);
+          const string genesymbol (al1->stxType == al2->stxType ? stxS + al1->stxType : stxType_reported);
           string subclass (stxType_reported /*genesymbol*/);
           strUpper (subclass);
           const size_t targetAlign = al2->targetEnd - al1->targetStart;
         //const size_t refLen = al1->refLen + al2->refLen;
         //const double refCoverage = double (al1->getAbsCoverage () + al2->getAbsCoverage ()) / double (refLen) * 100.0;
           const size_t alignmentLen = al1->length + al2->length;
-        //const string refAccessions (al1->refAccession + "," + al2->refAccession);  // No space: PD-5205
+          const string refAccessions (al1->refAccession + "," + al2->refAccession);  // No space: PD-5205
           const string fam (al1->getGenesymbol () + fusion_infix + al2->getGenesymbol ());
           td << na                // 1 "Protein identifier"  
              << targetName        // 2 "Contig id"
@@ -664,8 +685,8 @@ struct Operon
              << na /*refCoverage*/  //16 "% Coverage of reference sequence"
              << refIdentity       //17 "% Identity to reference sequence"
              << alignmentLen      //18 "Alignment length"
-             << na /*refAccessions*/     //19 "Accession of closest sequence"
-             << na /*"Shiga toxin " + genesymbol*/ //20 "Name of closest sequence"
+             << refAccessions     //19 "Accession of closest sequence"        // PD-5209
+             << "Shiga toxin " + genesymbol //20 "Name of closest sequence"   // PD-5209
              << na                //21 "HMM id"
              << na                //22 "HMM description"
              ;
@@ -742,10 +763,9 @@ private:
         return string ("2 ") + a [312] + a [318] + b [34];
       return "2";
     }
-  bool ambig () const
+  size_t xs () const
     { ASSERT (al2);
-      return    al1->ambig ()
-             || al2->ambig ();
+      return al1->xs + al2->xs;
     }
 public:
   double getIdentity () const
@@ -1219,7 +1239,6 @@ struct ThisApplication final : ShellApplication
           ASSERT (al->targetStrand == prev->targetStrand);
           ASSERT (al->subunit      == prev->subunit);
           if (   al->insideEq (*prev, 0)
-            //&& al->getDiff () >= prev->getDiff ()
               && al->getIdentity () <= prev->getIdentity ()  
              )
           {
@@ -1255,7 +1274,6 @@ struct ThisApplication final : ShellApplication
         if (   ! al2->reported
             && al2->insideEq (*al1, 3 * slack)  // PAR
             && (   al2->stxType [0] == al1->stxType [0] 
-              //|| al2->getDiff () >= al1->getDiff ()
                 || al1->getIdentity () >= al2->getIdentity ()  
                )
            )
