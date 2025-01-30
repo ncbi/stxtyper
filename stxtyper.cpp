@@ -32,32 +32,33 @@
 * Dependencies: NCBI BLAST, gunzip (optional)
 *
 * Release changes:
+*  1.0.38 01/30/2025 PD-5231  select matches to reference proteins as if the matches had been at nucleotide level
 *                             BlastAlignment::{positives --> xs}; Xs are not counted as identities
-*  1.0.37 01/29/2025 PD-5198  operin type priorities: ... < PARTIAL_CONTIG_END < PARTIAL < AMBIGUOUS [complete operon] < COMPLETE_NOVEL < COMPLETE
+*  1.0.37 01/29/2025 PD-5198  operon type priorities: ... < PARTIAL_CONTIG_END < PARTIAL < AMBIGUOUS [complete operon] < COMPLETE_NOVEL < COMPLETE
 *  1.0.36 01/14/2025 PD-5215  re-enable reporting "Name of closest sequence" for two-subunit operons
 *  1.0.35 01/14/2025 PD-5215  "Closest reference accession" field has two accessions separated by "," for two-subunit operons
-*  1.0.34 12/23/2024 PD-5209  Make the AMRFinderPlus columns "Closest reference accession" and "Closest reference name" to be NA (per PD-4910)
-*  1.0.33 12/23/2024 PD-5205  Replace ", " by "," in the AMRFinderPlus column "Closest reference accession"
-*  1.0.32 12/20/2024 PD-5201  Change empty fields to NA
+*  1.0.34 12/23/2024 PD-5209  make the AMRFinderPlus columns "Closest reference accession" and "Closest reference name" to be NA (per PD-4910)
+*  1.0.33 12/23/2024 PD-5205  replace ", " by "," in the AMRFinderPlus column "Closest reference accession"
+*  1.0.32 12/20/2024 PD-5201  change empty fields to NA
 *  1.0.31 12/17/2024 PD-5181  COMPLETE and COMPLETE_NOVEL is preferred over the other operon types
 *                             operons with higher identity and higher coverage are preferred
-*  1.0.30 12/14/2024          Bug in --debug
+*  1.0.30 12/14/2024          bug in --debug
 *                    PD-5191  strong operons should not be partial
 *                             --threads: reduces time by 30% for large input DNA
-*                             Bug in frame shifts detection (for multiple frame shifts in the same protein)
-*  1.0.29 12/13/2024 PD-5192  Only operons with >= 80% identity are reported   // Only BLAST HSPs with identity >= 80% are considered
+*                             bug in frame shifts detection (for multiple frame shifts in the same protein)
+*  1.0.29 12/13/2024 PD-5192  only operons with >= 80% identity are reported   // Only BLAST HSPs with identity >= 80% are considered
 *  1.0.28 12/03/2024          tblastn -gapextend 2
 *         10/30/2024          colorizeDir()
 *  1.0.27 10/23/2024 PD-5155  "Hierarchy node" with mixed types is <stx1>::<stx2>
-*  1.0.26 10/22/2024 PD-5085  Change column "Element length" to "Target length"
+*  1.0.26 10/22/2024 PD-5085  change column "Element length" to "Target length"
 *  1.0.25 08/16/2024 PD-5085  AMRFinderPlus column names to match MicroBIGG-E
 *  1.0.24 08/05/2024 PD-5076  "na" -> "NA"
 *  1.0.23 07/29/2024 PD-5064  AMBIGUOUS operon type
-*  1.0.22 07/25/2024          First codon L|I|V -> M
+*  1.0.22 07/25/2024          first codon L|I|V -> M
 *  1.0.21 07/15/2024 PD-5038  --nucleotide_output 
 *  1.0.20 05/21/2024 PD-5002  {A|B}_reference_subtype
 *  1.0.19 03/26/2024          BlastAlignment::targetAlign is removed
-*  1.0.18 03/19/2024 PD-4910  Element symbol is <stx type>_operon, Element name contains operon quality attribute"
+*  1.0.18 03/19/2024 PD-4910  element symbol is <stx type>_operon, Element name contains operon quality attribute"
 
           Sequence name -> Element name in header
           Sequence name, now Element name, should be type/subtype and include info when not complete e.g.,:
@@ -89,7 +90,7 @@
 *   1.0.7  02.15/2024 PD-4897  extend intergenic region for partial operons
 *   1.0.6  02/13/2024 PD-4874  --translation_table is removed
 *          02/13/2024 PD-4894  EXTENDED operon type
-*          02/13/2024 PD-4892  Subunits A and B are not preferred to be of the same stx class
+*          02/13/2024 PD-4892  subunits A and B are not preferred to be of the same stx class
 *   1.0.5  02/12/2024 PD-4891  -v == --version
 *                              stable choice of a blast hit among equivalent ones
 *   1.0.4  02/08/2024 PD-4891  stable choice of a blast hit among equivalent ones
@@ -116,6 +117,9 @@ using namespace Common_sp;
 #include "amrfinder_columns.hpp"
 
 #include "common.inc"
+
+
+#undef PROT_MATCH  // Nucleotide level matching to protein reference sequences
 
 
 
@@ -453,6 +457,7 @@ struct BlastAlignment
            //&& ! c_extended ()
              ;   
     }
+#ifdef PROT_MATCH
   bool perfect () const
     { return    ! truncated ()
              && ! partial ()
@@ -460,6 +465,7 @@ struct BlastAlignment
              && ! frameshift
              && ! stopCodon;
     }
+#endif
   bool insideEq (const BlastAlignment &other,
                  size_t slack_arg) const
     { return    targetStrand            == other. targetStrand
@@ -776,11 +782,13 @@ public:
     { ASSERT (al2);
       return double (al1->getAbsCoverage () + al2->getAbsCoverage ()) / double (al1->refLen + al2->refLen); 
     }
+#ifdef PROT_MATCH
   bool perfect () const
     { ASSERT (al2);
       return    al1->perfect ()
              && al2->perfect ();
     }
+#endif
   bool insideEq (const Operon &other,
                  size_t slack_arg) const
     { ASSERT (al2);
@@ -793,17 +801,21 @@ public:
          return false;
        if (! other. insideEq (*this, 3 * slack))  // PAR
          return false;
+     #ifdef PROT_MATCH
        if (perfect () > other. perfect ())
          return true;
        if (perfect () < other. perfect ())
          return false;
+     #endif
        return getIdentity () >= other. getIdentity ();
     }
   bool operator< (const Operon &other) const
     // Ordering by quality
     { ASSERT (al2);
       LESS_PART (*this, other, al1->targetName);
+    #ifdef PROT_MATCH
       LESS_PART (other, *this, perfect ());
+    #endif
       LESS_PART (other, *this, getIdentity ());
       LESS_PART (other, *this, getRelCoverage ());
       // Tie resolution
@@ -878,15 +890,20 @@ void goodBlasts2operons (const VectorPtr<BlastAlignment> &goodBlastAls,
          )
       {
         Operon op (*al1, *al2);
-        LOG ("Operon:\t" + to_string (op. getIdentity ()) + "\t" + to_string (stxClass2identity [op. al1->stxClass]));
+        LOG ("Operon: " + to_string (op. getIdentity ()) + " " + to_string (stxClass2identity [op. al1->stxClass]) + ":");
         op. saveTsvOut (logTd, true);  
         if (   ! strong 
             || (   op. getIdentity () >= stxClass2identity [op. al1->stxClass]
                 && op. getIdentity () >= stxClass2identity [op. al2->stxClass]
+              #ifdef PROT_MATCH
                 && op. perfect ()
+              #endif
                )
            )
+        {
           operons << std::move (op);
+          LOG ("Added");
+        }
       }
     }
   }
@@ -1194,16 +1211,6 @@ struct ThisApplication final : ShellApplication
         bool betterFound = false;
         for (const Operon& goodOp : goodOperons)
           if (goodOp. betterEq (op))
-          #if 0
-            if (   ! op. betterEq (goodOp)
-                || ! (   goodOp. perfect ()
-                      && op.     perfect ()
-                     )
-                || (   goodOp. getA () -> stxClass == op. getA () -> stxClass
-                    && goodOp. getB () -> stxClass == op. getB () -> stxClass
-                   )
-               )
-          #endif
           {
             betterFound = true;
             break;
