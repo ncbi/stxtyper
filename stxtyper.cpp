@@ -32,6 +32,7 @@
 * Dependencies: NCBI BLAST, gunzip (optional)
 *
 * Release changes:
+*  1.0.39 01/31/2025 PD-5231  suppress single-subunit operons overlappng with two-subunit operons
 *  1.0.38 01/30/2025 PD-5231  select matches to reference proteins as if the matches had been at nucleotide level
 *                             BlastAlignment::{positives --> xs}; Xs are not counted as identities
 *  1.0.37 01/29/2025 PD-5198  operon type priorities: ... < PARTIAL_CONTIG_END < PARTIAL < AMBIGUOUS [complete operon] < COMPLETE_NOVEL < COMPLETE
@@ -119,7 +120,7 @@ using namespace Common_sp;
 #include "common.inc"
 
 
-#undef PROT_MATCH  // Nucleotide level matching to protein reference sequences
+#undef PROT_MATCH  // Nucleotide level matching to protein reference sequences  // PD-5231
 
 
 
@@ -773,11 +774,15 @@ private:
     { ASSERT (al2);
       return al1->xs + al2->xs;
     }
+  size_t getTargetEnd () const
+    { return al2 ? al2->targetEnd : al1->targetEnd; }
+  size_t getNident () const
+    { return al2 ? al1->nident + al2->nident : al1->nident; }
+  size_t getLength () const
+    { return al2 ? al1->length + al2->length : al1->length; }
 public:
   double getIdentity () const
-    { ASSERT (al2);
-      return double (al1->nident + al2->nident) / double (al1->length + al2->length); 
-    }
+    { return (double) getNident () / (double) getLength (); }
   double getRelCoverage () const 
     { ASSERT (al2);
       return double (al1->getAbsCoverage () + al2->getAbsCoverage ()) / double (al1->refLen + al2->refLen); 
@@ -791,10 +796,9 @@ public:
 #endif
   bool insideEq (const Operon &other,
                  size_t slack_arg) const
-    { ASSERT (al2);
-      return    al1->targetStrand            == other. al1->targetStrand
+    { return    al1->targetStrand            == other. al1->targetStrand
     	       && al1->targetStart + slack_arg >= other. al1->targetStart 
-             && al2->targetEnd               <= other. al2->targetEnd + slack_arg;
+             && getTargetEnd ()              <= other. getTargetEnd () + slack_arg;
     }
   bool betterEq (const Operon &other) const
     {  if (al1->targetName != other. al1->targetName)
@@ -1267,6 +1271,7 @@ struct ThisApplication final : ShellApplication
      	if (al1->getIdentity () < identity_min)
      	  continue;
       Operon op (*al1);
+    #if 0
       goodOperons << std::move (op);
       FFOR_START (size_t, j, i + 1, goodBlastAls. size ())
       {
@@ -1286,6 +1291,17 @@ struct ThisApplication final : ShellApplication
            )
           var_cast (al2) -> reported = true;
       }
+    #else
+      bool good = true;
+      for (const Operon& op_good : goodOperons)
+        if (op_good. betterEq (op))  
+        {
+          good = false;
+          break;
+        }
+      if (good)
+        goodOperons << std::move (op);
+    #endif
     }
 
     // Report
