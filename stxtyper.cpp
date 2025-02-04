@@ -32,6 +32,7 @@
 * Dependencies: NCBI BLAST, gunzip (optional)
 *
 * Release changes:
+*  1.0.40 02/04/2025 PD-5231  PARTIAL_CONTIG_END < EXTENDED
 *  1.0.39 01/31/2025 PD-5231  suppress single-subunit operons overlappng with two-subunit operons
 *  1.0.38 01/30/2025 PD-5231  select matches to reference proteins as if the matches had been at nucleotide level
 *                             BlastAlignment::{positives --> xs}; Xs are not counted as identities
@@ -184,9 +185,9 @@ struct BlastAlignment
     // bp
   
   // Reference
-  // Whole sequence ends with '*'
   string refAccession;
   string refSeq;
+    // Whole sequence ends with '*'
   // Function of refAccession
   string stxType;
   string stxClass;
@@ -304,6 +305,7 @@ struct BlastAlignment
       QC_ASSERT (targetSeq. size () == refSeq. size ());
       QC_IMPLY (! frameshift, length == targetSeq. size ());
       QC_ASSERT (stxType. size () == 2);
+      QC_IMPLY (truncated (), partial ());
     }
   void saveText (ostream &os) const 
     {
@@ -314,7 +316,7 @@ struct BlastAlignment
     { if (! td. live ())
         return;
       const string stxType_reported (verboseP ? getGenesymbol () : (stxS + stxType. substr (0, 1)));
-    #if 1
+    #if 0
       const string quality (frameshift 
                               ? "FRAMESHIFT"
                               : stopCodon 
@@ -332,13 +334,13 @@ struct BlastAlignment
                               ? "FRAMESHIFT"
                               : stopCodon 
                                 ? "INTERNAL_STOP"
-                                : truncated () || otherTruncated ()
+                                : truncated () /*|| otherTruncated ()*/
                                   ? "PARTIAL_CONTIG_END"
-                                  : verboseP && getRelCoverage () == 1.0
+                                  : debugP && verboseP && getRelCoverage () == 1.0
                                     ? "COMPLETE_SUBUNIT"
                                     : c_extended ()
                                       ? "EXTENDED"
-                                      : "PARTIAL"
+                                      : "PARTIAL_CONTIG_END"  // "PARTIAL"
                            );
     #endif
       const char strand (targetStrand ? '+' : '-');
@@ -439,19 +441,21 @@ struct BlastAlignment
   double getRelCoverage () const 
     { return (double) getAbsCoverage () / (double) refLen; }
   bool truncated () const
-    { return    (targetStart           <= 3 /*Locus::end_delta*/ && ((targetStrand && refStart)            || (! targetStrand && refEnd + 1 < refLen)))
-             || (targetLen - targetEnd <= 3 /*Locus::end_delta*/ && ((targetStrand && refEnd + 1 < refLen) || (! targetStrand && refStart)));
+    { return    (targetStart           < 3 /*Locus::end_delta*/ && ((targetStrand && refStart)        || (! targetStrand && refEnd < refLen)))
+             || (targetLen - targetEnd < 3 /*Locus::end_delta*/ && ((targetStrand && refEnd < refLen) || (! targetStrand && refStart)));
     }
+#if 0
   bool otherTruncated () const
     { constexpr size_t missed_max = intergenic_max + 3 * 20 /*min. domain length*/;  // PAR
       return    (targetStrand == (subunit == 'B') && targetStart           <= missed_max)
              || (targetStrand == (subunit == 'A') && targetLen - targetEnd <= missed_max);
     }
+#endif
   bool c_extended () const 
     {/*if (truncated ())  
         return false; */
       return    ! refStart             // N-terminus is complete
-             && refEnd + 1 == refLen;  // "*" (stop codon) is missing
+             && refEnd + 1 == refLen;  // Only "*" (stop codon) is missing
     }
   bool partial () const
     { return    getRelCoverage () < 1.0 
@@ -607,16 +611,16 @@ struct Operon
                                  :    al1->stopCodon 
                                    || al2->stopCodon 
                                      ? "INTERNAL_STOP"
-                                     :    al1->c_extended ()
-                                       || al2->c_extended ()
-                                         ? "EXTENDED" 
-                                         :    al1->truncated () 
-                                           || al2->truncated ()
-                                             ? "PARTIAL_CONTIG_END"
+                                     :    al1->truncated () 
+                                       || al2->truncated ()
+                                         ? "PARTIAL_CONTIG_END"
+                                         :    al1->c_extended ()
+                                           || al2->c_extended ()
+                                             ? "EXTENDED" 
                                              :    al1->partial ()
                                                || al2->partial ()
                                                ? "PARTIAL"  
-                                             // complete operon types
+                                               // complete operon types
                                                : novel
                                                  ? xs ()
                                                    ? "AMBIGUOUS"
