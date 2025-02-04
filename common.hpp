@@ -102,7 +102,6 @@ bool initCommon ();
   // Invoked automaticallly
 
 
-
 // Numeric types
 
 typedef  unsigned char  uchar; 
@@ -117,7 +116,7 @@ constexpr size_t no_index = numeric_limits<size_t>::max ();
 static_assert ((size_t) 0 - 1 == no_index);
 
 constexpr double NaN = numeric_limits<double>::quiet_NaN ();  
-
+  
 
 
 // Global variables
@@ -149,15 +148,26 @@ constexpr const char* error_caption ("*** ERROR ***");
 
 void errorExitStr (const string &msg);
   // For debugger: should not be inline
+  // Invokes: beep()
 
 [[noreturn]] void throwf (const string &s); 
   // For debugger: should not be inline
-  // Invokes: logic_error
+  // Invokes: throw logic_error
+
+
+void sleepNano (long nanoSec);
+
+
 
 void beep ();
   // Requires: !isRedirected()
   //           SHLVL = 1 ??
     
+
+
+template <typename T> 
+  inline bool isNan (T x)
+    { return x != x; }
 
 
 // Comparison templates
@@ -311,7 +321,7 @@ template <typename T, size_t N>
     }
 
 template <typename T, size_t N>
-  bool contains (const array<T,N> &arr, const T item)
+  inline bool contains (const array<T,N> &arr, const T item)
     { return indexOf (arr, item) != no_index; }
 
 template <typename Key, typename Value, typename KeyParent>
@@ -412,7 +422,11 @@ template <typename T, typename UnaryPredicate>
 template <typename To, typename From>
   inline void insertAll (To &to,
                          const From &from)
-    { to. insert (to. begin (), from. begin (), from. end ()); }
+    { 
+    #pragma GCC diagnostic ignored "-Waggressive-loop-optimizations"
+      to. insert (to. begin (), from. begin (), from. end ()); 
+    #pragma GCC diagnostic warning "-Waggressive-loop-optimizations"
+    }
 
 template <typename To, typename From>
   inline void insertIter (To &to,
@@ -456,10 +470,14 @@ template <typename T /*container*/>
 typedef  map<string/*key*/,string/*value*/>  KeyValue;
 
 inline string find (const KeyValue& kv,
-                    const string& key)
+                    const string& key,
+                    bool force)
   { const auto& it = kv. find (key);
     if (it == kv. end ())
+    { if (force)
+        return key;
       throw runtime_error ("Key \"" + key + "\" is not found");
+    }
     return it->second;
   }
 
@@ -471,10 +489,17 @@ extern hash<string> str_hash;
 
 extern hash<size_t> size_hash;
 
-constexpr size_t hash_class_max = 1000;  // PAR
+// PAR
+constexpr size_t small_hash_class_max = 1000;  
+constexpr size_t large_hash_class_max = small_hash_class_max * 100;  
 
-inline size_t str2hash_class (const string &s)
-  { return str_hash (s) % hash_class_max; }
+inline size_t str2hash_class (const string &s,
+                              bool large_hash)
+  { return str_hash (s) % (large_hash 
+                             ? large_hash_class_max 
+                             : small_hash_class_max
+                          ); 
+  }
  
 
 
@@ -574,6 +599,7 @@ inline bool isDelimiter (char c)
 inline bool isSpace (char c)
   { return c > '\0' && c <= ' ' && isspace (c); }
 
+string to_url (const string &s);
 
 
 // char*
@@ -632,6 +658,10 @@ inline string unQuote (const string &s)
 
 bool strBlank (const string &s);
 
+bool getScientific (string numberS,
+                    bool &hasPoint,
+                    streamsize &decimals);
+
 template <typename T>
   string toString (const T &t)
     { ostringstream oss;
@@ -660,28 +690,6 @@ template <typename T>
         catch (...) { return false; } 
     }
 
-inline bool isLeft (const string &s,
-                    const string &left)
-  { return s. substr (0, left. size ()) == left; }
-
-bool isRight (const string &s,
-              const string &right);
-
-bool trimPrefix (string &s,
-                 const string &prefix);
-  // Return: success
-
-bool trimSuffix (string &s,
-                 const string &suffix);
-  // Return: success
-
-void trimSuffixNonAlphaNum (string &s);
-
-bool trimTailAt (string &s,
-                 const string &tailStart);
-  // Return: trimmed
-  // Update: s
-
 void commaize (string &s);
   // ' ' --> ','
 
@@ -695,13 +703,20 @@ inline bool isLeftBlank (const string &s,
 
 string pad (const string &s,
             size_t size,
-            ebool right);
+            ebool right,
+            char space = ' ');
   // right: enull - center
+  
+template <typename T>
+  string padNatural (T natural,
+                     size_t size)
+    { return pad (to_string (natural), size, etrue, '0'); }
 
 bool goodName (const string &name);
 
 bool isIdentifier (const string& name,
                    bool dashInName);
+  // Return: true. !empty(), !dashInName => (c \in mame => isLetter(c))
 
 bool isNatural (const string& name,
                 bool leadingZeroAllowed);
@@ -724,15 +739,38 @@ inline bool charInSet (char c,
 		                   const string &charSet)
   { return charSet. find (c) != string::npos; }
 
-string::const_iterator stringInSet (const string &s,
-                    	           	  const string &charSet);
-  // Return: != s.end() => *Return is not in charSet
+size_t stringNotInSet (const string &s,
+                   	   const string &charSet,
+                   	   ebool uppercase);
+  // Return: index in s which is not in charSet; may be no_index
 
 size_t strCountSet (const string &s,
 		                const string &charSet);
 
 void strDeleteSet (string &s,
 		               const string &charSet);
+
+inline bool isLeft (const string &s,
+                    const string &left)
+  { return s. substr (0, left. size ()) == left; }
+
+bool isRight (const string &s,
+              const string &right);
+
+bool trimPrefix (string &s,
+                 const string &prefix);
+  // Return: success
+
+bool trimSuffix (string &s,
+                 const string &suffix);
+  // Return: success
+
+void trimSuffixNonAlphaNum (string &s);
+
+bool trimTailAt (string &s,
+                 const string &tailStart);
+  // Return: trimmed
+  // Update: s
 
 void trimLeading (string &s);
 
@@ -755,6 +793,17 @@ inline void trim (string &s,
                   char c)
   { trimTrailing (s, c);
     trimLeading  (s, c); 
+  }
+
+inline bool strNull (const string &s)
+  { if (strBlank (s))
+      return true;
+    string s1 (s);
+    trim (s1);
+    strUpper (s1);
+    return    s1 == "NULL"
+           || s1 == "NA"
+           || s1 == "N/A";
   }
 
 inline bool contains (const string &hay,
@@ -887,12 +936,19 @@ size_t powInt (size_t a,
 
 
 
+// Time
+
+string getNow ();
+  // Return: YYYY-MM-DD HH:mm:SS
+
+
+
 struct Rand
 // Numerical Recipes in C, p. 279
 {
 	static const long /*actually ulong*/ max_;
 private:
-	long seed;
+	long seed {0};
 	  // 0 < seed < max_
 public:
 	
@@ -946,11 +1002,11 @@ struct DisjointCluster
 // Cormen, Leiserson, Rivest, Introduction to Algorithms, p. 449
 {
 protected:
-  DisjointCluster* parentDC;
+  DisjointCluster* parentDC {nullptr};
     // !nullptr
     // Tree
     // = this <=> root
-  size_t rankDC;
+  size_t rankDC {0};
     // Upper bound on the height of *this
     // (Height = max. # arcs between *this and a leaf)
 public:
@@ -980,8 +1036,8 @@ struct Nocopy
 {
 protected:
 	Nocopy () = default;
-  Nocopy (const Nocopy &) = delete;
-  Nocopy (Nocopy &&) = delete;
+  explicit Nocopy (const Nocopy &) = delete;
+  explicit Nocopy (Nocopy &&) = delete;
   Nocopy& operator= (const Nocopy &) = delete;
 };
 
@@ -1065,6 +1121,10 @@ template <typename T>
       }
     void swap ()
       { std::swap (P::first, P::second); }
+    bool empty () const
+      { return    P::first  == T ()
+               && P::second == T ();
+      }
   };
 
 
@@ -1093,6 +1153,18 @@ template <typename T>
     template <typename U/*:<T>*/>
       explicit List (const vector<U> &other)
         { *this << other; }
+    bool empty () const
+      {
+      #pragma GCC diagnostic ignored "-Wnull-dereference"
+        return P::empty ();
+      #pragma GCC diagnostic warning "-Wnull-dereference"
+      }
+    size_t size () const
+      {
+      #pragma GCC diagnostic ignored "-Wnull-dereference"
+        return P::size ();
+      #pragma GCC diagnostic warning "-Wnull-dereference"
+      }
 
   	  
   	T at (size_t index) const
@@ -1187,7 +1259,7 @@ string list2str (const List<string> &strList,
     ...
 */
 template <typename T>
-  struct Iter : Nocopy
+  struct Iter final : Nocopy
   {
   private:
     T& t;
@@ -1338,6 +1410,9 @@ void copyText (const string &inFName,
 
   void removeDirectory (const string &dirName);
     // With its contents
+                        
+  string makeTempDir ();
+    // And test
 
   void concatTextDir (const string &inDirName,
                       const string &outFName);
@@ -1416,7 +1491,7 @@ void readLine (istream &is,
 
 
 
-struct Istringstream : istringstream
+struct Istringstream final : istringstream
 {
   Istringstream () = default;
   void reset (const string &s)
@@ -1475,7 +1550,7 @@ struct Color
 		#ifdef _MSC_VER
 		  return noString
 		#else
-    	return string ("\033[") + (bright ? "1;" : "") + to_string (color) + "m"; 
+    	return string ("\033[") + (bright ? "1;" : "") + to_string ((int) color) + "m"; 
 		#endif
     }
 };
@@ -1483,20 +1558,25 @@ struct Color
   
 inline string colorize_raw (const string &s,
                             Color::Type color,
+                            bool bright,
                             bool screen)
   { if (! screen)
       return s;
-    return Color::code (color, true) + s + Color::code ();
+    return Color::code (color, bright) + s + Color::code ();
   }
 
 inline string colorize (const string &s,
                         bool screen)
-  { return colorize_raw (s, Color::white, screen); }
-
+  { return colorize_raw (s, Color::white, true, screen); }  
+    
 inline string colorizeUrl (const string &s,
                            bool screen)
-  { return colorize_raw (s, Color::blue, screen); }
+  { return colorize_raw (s, Color::blue, true, screen); }  
   
+inline string colorizeDir (const string &s,
+                           bool screen)
+  { return colorize_raw (s, Color::green, false, screen); }  
+
 
 class OColor
 // Output color
@@ -1567,13 +1647,13 @@ private:
                          int fd2);
 public:
 #endif
-template <class T>
-  const COutErr& operator<< (const T &val) const
-    { cout << val;
-      if (! both)
-        cerr << val;
-      return *this;
-    }
+  template <typename T>
+    const COutErr& operator<< (const T &val) const
+      { cout << val;
+        if (! both)
+          cerr << val;
+        return *this;
+      }
   const COutErr& operator<< (ostream& (*pfun) (ostream&)) const
     { pfun (cout);
       if (! both)
@@ -1694,6 +1774,29 @@ void exec (const string &cmd,
   string which (const string &progName);
     // Return: isRight(,"/") or empty() if there is no path
 #endif
+
+
+
+struct Lock
+{
+  const bool active;
+private:
+  std::mutex& mtx;
+public:
+    
+    
+  explicit Lock (std::mutex &mtx_arg,
+                 bool active_arg = true)
+    : active (active_arg)
+    , mtx (mtx_arg)
+    { if (active)
+        mtx_arg. lock (); 
+    }
+ ~Lock ()
+    { if (active)
+        mtx. unlock (); 
+    }
+};
 
 
 
@@ -1903,7 +2006,7 @@ struct Xml
   
 
   
-  struct TextFile : File
+  struct TextFile final : File
   // Tag::name: idenifier with possible '-'
   {
   private:
@@ -1933,7 +2036,7 @@ struct Xml
   
   
   
-  struct BinFile : File
+  struct BinFile final : File
   // Binary XML
   //   <Data> ::= <nameIndex> <Data>* 0 0 <text> 0
   //     <nameIndex> ::= <byte> <byte>
@@ -2006,15 +2109,17 @@ public:
       saveText (oss);
       return oss. str ();
     }
+#if 0
   void trace (ostream& os,
               const string& title) const;
+#endif
   virtual void saveXml (Xml::File& /*f*/) const 
     { throwf ("Root::saveXml() is not implemented"); }
   virtual Json* toJson (JsonContainer* /*parent_arg*/,
                         const string& /*name_arg*/) const
     { throwf ("Root::toJson() is not implemented"); }
 	virtual bool empty () const
-	  { return true; }
+	  { throwf ("Root::empty() is not implemented"); }
   virtual void clear ()
     { throwf ("Root::clear() is not implemented"); }
     // Postcondition: empty()
@@ -2031,7 +2136,7 @@ inline ostream& operator<< (ostream &os,
 
 
 template <typename T /*Root*/> 
-  struct AutoPtr : unique_ptr<T>  
+  struct AutoPtr final : unique_ptr<T>  
   {
   private:
   	typedef  unique_ptr<T>  P;
@@ -2069,6 +2174,18 @@ struct VirtNamed : Root
 {
 	virtual string getName () const = 0;
 };
+
+
+template <typename ParentValue/*:VirtNamed*/, typename Value/*:ParentValue*/>
+  inline bool containsNamed (const map <string, const ParentValue*> &m,
+                             const Value* t)
+    { if (! t)
+        return false;
+      const auto& it = m. find (t->getName ());
+      if (it == m. end ())
+        return false;
+      return it->second == t;
+    }
 
 
 
@@ -2208,6 +2325,22 @@ template <typename T>
             n++;
         return n;
       }
+    bool overlapStart (size_t start,
+                       const vector<T> &other) const
+      { const size_t end = min (P::size (), start + other. size ());
+        for (size_t i = start, j = 0; i < end; i++, j++)
+          if ((*this) [i] != other [j])
+            return false;
+        return true;
+      }
+    size_t overlapStart_min (const vector<T> &other,
+                             size_t start_min) const
+      { for (size_t start = start_min; start < P::size (); start++)
+          if (overlapStart (start, other))
+            return start;
+        return P::size ();
+      }
+      // a = v.overlapStart_min(v,1), a < v.size(), v.size() % a == 0 => a is the period of v
     void checkSorted () const
       { if (! searchSorted)
       	  throw runtime_error ("Vector is not sorted for search");
@@ -2706,9 +2839,14 @@ template <typename T /* : Root */>
         { P::operator<< (other); 
           return *this;
         }
+    template <typename U/*:<T>*/>
+      VectorPtr<T>& operator<< (VectorPtr<U> &&other)
+        { P::operator<< (std::move (other)); 
+          return *this;
+        }
   	void deleteData ()
   	  {	for (const T* t : *this)
-  			  delete t;
+			    delete t;
   			P::clear ();
   	  }
     void erasePtr (size_t index)
@@ -2822,7 +2960,11 @@ template <typename T /* : Root */>
   	    return *this;
   	  }
    ~VectorOwn ()
-      { P::deleteData (); }
+      { 
+      #pragma GCC diagnostic ignored "-Wnull-dereference"
+        P::deleteData (); 
+      #pragma GCC diagnostic warning "-Wnull-dereference"
+      }
 
 
     VectorOwn<T>& operator<< (const T* value)
@@ -2860,97 +3002,6 @@ template <typename T /* : Root */>
         }
     };
   };
-
-
-
-struct StringVector : Vector<string>
-{
-private:
-	typedef  Vector<string>  P;
-public:
-	
-
-  StringVector () = default;
-  explicit StringVector (initializer_list<string> init)
-    : P (init)
-    {}
-  StringVector (const string &fName,
-                size_t reserve_size,
-                bool trimP);
-  StringVector (const string &s, 
-                char sep,
-                bool trimP);
-  explicit StringVector (size_t n)
-    : P (n, noString)
-    {}
-
-
-  string toString (const string& sep) const;
-  string toString () const
-    { return toString (noString); }
-  bool same (const StringVector &vec,
-             const Vector<size_t> &indexes) const;
-  void to_xml (Xml::File &f,
-               const string &tag);
-    // XML: <tag> <item>at(0)</item> <item>at(1)</item> ... </tag>
-    // Invokes: sort(), clear()
-
-
-  struct Hasher 
-  {
-    size_t operator () (const StringVector& vec) const 
-    { size_t ret = 0;
-      for (const string& s : vec) 
-        ret ^= hash<string>() (s);
-      return ret;
-    }
-  };
-};
-
-
-
-template <typename Key /*VirtNamed*/>
-  StringVector set2vec (const set<const Key*> &s)
-    { StringVector vec;  vec. reserve (s. size ());
-	    for (const Key* key : s)
-	    { assert (key);
-	    	vec << key->getName ();
-	    }
-	    return vec;
-    }
-
-
-
-struct Csv 
-// Line of Excel .csv-file
-{
-private:
-  const string &s;
-  size_t pos {0};
-public:
-
-  
-  explicit Csv (const string &s_arg)
-    : s (s_arg)
-    {}
-  
-  
-  bool goodPos () const
-    { return pos < s. size (); }
-  string getWord ();
-    // Return: Next word
-    // Requires: goodPos()
-private:
-  void findChar (char c)
-    { while (goodPos () && s [pos] != c)
-        pos++;
-    }
-};
-
-  
-  
-StringVector csvLine2vec (const string &line);
-  // Invokes: Csv
 
 
 
@@ -3188,6 +3239,99 @@ template <typename T, typename U /* : T */>
 
 
 
+struct StringVector : Vector<string>
+{
+private:
+	typedef  Vector<string>  P;
+public:
+	
+
+  StringVector () = default;
+  explicit StringVector (initializer_list<string> init)
+    : P (init)
+    {}
+  explicit StringVector (const Set<string> &from)
+    { insertAll (*this, from); 
+      searchSorted = true;
+    }
+  StringVector (const string &fName,
+                size_t reserve_size,
+                bool trimP);
+  StringVector (const string &s, 
+                char sep,
+                bool trimP);
+  explicit StringVector (size_t n)
+    : P (n, noString)
+    {}
+
+
+  string toString (const string& sep = noString) const;
+  bool same (const StringVector &vec,
+             const Vector<size_t> &indexes) const;
+  void to_xml (Xml::File &f,
+               const string &tag);
+    // XML: <tag> <item>at(0)</item> <item>at(1)</item> ... </tag>
+    // Invokes: sort(), clear()
+
+
+  struct Hasher 
+  {
+    size_t operator () (const StringVector& vec) const 
+    { size_t ret = 0;
+      for (const string& s : vec) 
+        ret ^= hash<string>() (s);
+      return ret;
+    }
+  };
+};
+
+
+
+template <typename Key /*VirtNamed*/>
+  StringVector set2vec (const set<const Key*> &s)
+    { StringVector vec;  vec. reserve (s. size ());
+	    for (const Key* key : s)
+	    { assert (key);
+	    	vec << key->getName ();
+	    }
+	    return vec;
+    }
+
+
+
+struct Csv 
+// Line of Excel .csv-file
+{
+private:
+  const string &s;
+  size_t pos {0};
+public:
+
+  
+  explicit Csv (const string &s_arg)
+    : s (s_arg)
+    {}
+  
+  
+  bool goodPos () const
+    { return pos < s. size (); }
+  string getWord ();
+    // Return: Next word
+    // Requires: goodPos()
+private:
+  void findChar (char c)
+    { while (goodPos () && s [pos] != c)
+        pos++;
+    }
+};
+
+  
+  
+StringVector csvLine2vec (const string &line);
+  // Invokes: Csv
+
+
+
 template <typename T>  
   struct RandomSet
   // Set stored in a vector for a random access
@@ -3258,7 +3402,6 @@ template <typename T>
     SetHeapIndex setHeapIndex {nullptr};
       // Needed to invoke increaseKey()
   public:
-
 
 
     explicit Heap (const CompareInt &comp_arg,
@@ -3372,9 +3515,9 @@ template <typename T>
 
     // Test
     static void testStr ()    
-      { StringVector vec {"Moscow", "San Diego", "Los Angeles", "Paris"};
-        Heap<string> heap (strComp);
-        for (string& s : vec)
+      { const StringVector vec {"Moscow", "San Diego", "Los Angeles", "Paris"};
+        Heap<const string> heap (strComp);
+        for (const string& s : vec)
           heap << & s;
         while (! heap. empty ())  
         { cout << * heap. getMaximum () << endl;
@@ -3386,8 +3529,8 @@ template <typename T>
                         const void* s2)
       { const string& s1_ = * static_cast <const string*> (s1);
         const string& s2_ = * static_cast <const string*> (s2);
-        if (s1_ > s2_)  return -1;
         if (s1_ < s2_)  return  1;
+        if (s1_ > s2_)  return -1;
         return 0;
       }
   };
@@ -3453,8 +3596,14 @@ public:
 
   bool on () const
     { return enabled && threads_max == 1; }
+  bool started () const
+    { return startTime != noclock; }
   void start ();
+    // Requires: !started()
   void stop ();
+    // Requires: started()
+  void cancel ()
+    { startTime = noclock; }
   void print (ostream &os) const;
 };
 
@@ -3594,15 +3743,7 @@ public:
     { return    lineNum == other. lineNum
     	       && charNum == other. charNum;
     }
-  string str () const
-	  { return "line " + to_string (lineNum + 1) + ", " +
-	  	          (eol () 
-	  	             ? "end of line" 
-	  	             : last ()
-	  	                 ?	"last position"
-	  	                 : "pos. " + to_string (charNum + 1)
-	  	          ); 
-	  }
+  string str () const;
 
 	
 	void inc (bool eol_arg);
@@ -3616,12 +3757,12 @@ public:
 
 
   struct Error : runtime_error
-  { Error (const TextPos tp,
-           const string &what,
-		       bool expected = true)
-      : runtime_error ((tp. str () + ": " + what + ifS (expected, " is expected")). c_str ())
-    {}
-  };
+    { Error (const TextPos tp,
+             const string &what,
+        	   bool expected = true)
+        : runtime_error ((tp. str () + what + ifS (expected, " is expected")). c_str ())
+        {}
+    };
 };
 
 
@@ -3678,8 +3819,6 @@ struct LineInput : Input
 
 	bool nextLine ();
   	// Output: line
-  	// Update: tp
-    // Invokes: trimTrailing()
 	bool expectPrefix (const string &prefix,
 	                   bool eofAllowed)
 		{ if (nextLine () && trimPrefix (line, prefix))
@@ -3764,9 +3903,9 @@ struct Token : Root
 	enum Type { eName
 	          , eDelimiter  
 	          , eText
-	          , eInteger   
+	          , eInteger   // 10-based or 16-based: 0xNNNN...
 	          , eDouble
-	          , eDateTime
+	          , eDateTime  // Example: 2018-08-13T16:12:54.487
 	          };
  // Valid if !empty()
 	Type type {eDelimiter};
@@ -3840,6 +3979,9 @@ public:
 	  { *this = Token (); }
 
 
+  [[noreturn]] void error (const string &what,
+                           bool expected = true) const
+		{ throw TextPos::Error (tp, what, expected); }  
 	static string type2str (Type type) 
 	  { switch (type)
 	  	{ case eName:      return "name";
@@ -3903,6 +4045,7 @@ private:
   const bool consecutiveQuotesInText;
     // Two quotes encode one quote
   Token last;
+	TextPos tp;
 public:
 
 
@@ -3928,13 +4071,9 @@ public:
     {}
 
 
-  [[noreturn]] void error (const Token &wrongToken,
-                           const string &what,
-                           bool expected = true) const
-    { throw TextPos::Error (wrongToken. tp, what, expected); }
   [[noreturn]] void error (const string &what,
 	                         bool expected = true) const
-		{ ci. error (what, expected); }  
+		{ throw TextPos::Error (tp, what, expected); }  
 
   Token get ();
     // Return: empty() <=> EOF
@@ -3952,17 +4091,17 @@ public:
 	void get (const string &expected)
     { const Token t (get ());
     	if (! t. isNameText (expected))
-   			error (t, Token::type2str (Token::eName) + " " + strQuote (expected)); 
+   			t. error (Token::type2str (Token::eName) + " " + strQuote (expected)); 
     }
 	void get (int expected)
     { const Token t (get ());
     	if (! t. isInteger (expected))
-  			error (t, Token::type2str (Token::eInteger) + " " + to_string (expected)); 
+  			t. error (Token::type2str (Token::eInteger) + " " + to_string (expected)); 
     }
 	void get (double expected)
     { const Token t (get ());
     	if (! t. isDouble (expected))
-   			error (t, Token::type2str (Token::eDouble) + " " + toString (expected)); 
+   			t. error (Token::type2str (Token::eDouble) + " " + toString (expected)); 
     }
 	void get (char expected)
     { const Token t (get ());
@@ -3970,7 +4109,9 @@ public:
    			error (Token::type2str (Token::eDelimiter) + " " + strQuote (toString (expected), '\'')); 
     }
   void setLast (Token &&t)
-    { last = std::move (t); }
+    { last = std::move (t); 
+      tp = last. tp;
+    }
   bool getNext (char expected)
     { Token token (get ());
       if (! token. isDelimiter (expected))
@@ -3979,6 +4120,29 @@ public:
       }
       return true;
     }
+};
+
+
+
+
+struct BraceInput : TokenInput
+{
+  static constexpr char commentC {'#'};
+  static constexpr const char* commentS {"comment"};
+  static constexpr char endChar {';'};
+
+
+  explicit BraceInput (const string &fName)
+    : TokenInput (fName, commentC)
+    {}
+  explicit BraceInput (istream &is_arg)
+    : TokenInput (is_arg, commentC)
+    {}
+
+
+  static string endS ()
+    { return string (1, endChar); }
+  void skipComment ();
 };
 
 
@@ -4040,7 +4204,7 @@ public:
 
 
 
-struct JsonNull : Json
+struct JsonNull final : Json
 {
   explicit JsonNull (JsonContainer* parent,
                      const string& name = noString)
@@ -4056,7 +4220,7 @@ struct JsonNull : Json
 
 
 
-struct JsonString : Json
+struct JsonString final : Json
 {
   const string s;
 
@@ -4077,7 +4241,7 @@ struct JsonString : Json
 
 
 
-struct JsonInt : Json
+struct JsonInt final : Json
 {
   const long long n;
   
@@ -4097,7 +4261,7 @@ struct JsonInt : Json
 
 
 
-struct JsonDouble : Json
+struct JsonDouble final : Json
 {
   const double n;
   const streamsize decimals;
@@ -4128,7 +4292,7 @@ struct JsonDouble : Json
 
 
 
-struct JsonBoolean : Json
+struct JsonBoolean final : Json
 {
   const bool b;
   
@@ -4162,7 +4326,7 @@ public:
 
 
 
-struct JsonArray : JsonContainer
+struct JsonArray final : JsonContainer
 {
   friend struct Json;
 private:
@@ -4191,7 +4355,7 @@ public:
 
 
 
-struct JsonMap : JsonContainer
+struct JsonMap final : JsonContainer
 {
   friend struct Json;
 private:
@@ -4269,7 +4433,7 @@ public:
 
 
 
-struct FileItemGenerator : ItemGenerator, Nocopy
+struct FileItemGenerator final : ItemGenerator, Nocopy
 {
 private:
   string fName;
@@ -4289,7 +4453,7 @@ public:
   
 
 #ifndef _MSC_VER
-struct RawDirItemGenerator : ItemGenerator, Nocopy
+struct RawDirItemGenerator final : ItemGenerator, Nocopy
 {
 private:
   string dirName;
@@ -4316,7 +4480,7 @@ public:
 
 
 
-struct DirItemGenerator : ItemGenerator
+struct DirItemGenerator final : ItemGenerator
 {
 private:
   StringVector vec;
@@ -4345,7 +4509,7 @@ public:
 
   
 
-struct NumberItemGenerator : ItemGenerator
+struct NumberItemGenerator final : ItemGenerator
 {
 private:
   size_t index {0};
@@ -4471,6 +4635,9 @@ struct Application : Singleton<Application>, Root
   const bool needsArg;
   const bool gnu;
   const bool threadsUsed;
+  string execDir;
+    // Ends with '/'
+    // Physically real directory of the software
   static constexpr const char* helpS {"help"};
   static constexpr const char* versionS {"version"};
   
@@ -4492,7 +4659,7 @@ protected:
     virtual const Key* asKey () const
       { return nullptr; }
   };
-  struct Positional : Arg
+  struct Positional final : Arg
   {
     Positional (const string &name_arg, 
                 const string &description_arg)
@@ -4503,7 +4670,7 @@ protected:
     const Positional* asPositional () const final
       { return this; }
   };  
-  struct Key : Arg
+  struct Key final : Arg
   {
   	const Application& app;
     const bool flag;
@@ -4620,8 +4787,7 @@ protected:
   string getProgramDirName () const
     { return getDirName (programArgs. front ()); }
 protected:
-  virtual void initEnvironment ()
-    {}
+  virtual void initEnvironment ();
   virtual void initVar ()
     {}
   string getInstruction (bool screen) const;
@@ -4639,6 +4805,7 @@ public:
   int run (int argc, 
            const char* argv []);
     // Invokes: body()
+    // if runtime_error then exit(1) else errorExit()
 private:
   virtual void body () const = 0;
     // Invokes: initEnvironment()
@@ -4656,12 +4823,8 @@ protected:
   string tmp;
     // Temporary directory: ($TMPDIR or "/tmp") + "/" + programName + "XXXXXX"
     // If log is used then tmp is printed in the log file and the temporary files are not deleted 
-private:
-  bool tmpCreated {false};
-protected:
-  string execDir;
-    // Ends with '/'
-    // Physically real directory of the software
+    // !empty() => useTmp
+    // See https://systemd.io/TEMPORARY_DIRECTORIES/
   mutable KeyValue prog2dir;
   mutable Stderr stderr;
   time_t startTime {0};
@@ -4700,7 +4863,7 @@ protected:
   string exec2str (const string &cmd,
                    const string &tmpName,
                    const string &logFName = noString) const;
-    // Return: `cmd > <tmp>/tmpName && cat <tmp>/tmpName`
+    // Return: $( cmd > <tmp>/tmpName && cat <tmp>/tmpName )
     // Requires: cmd produces one line
   string uncompress (const string &quotedFName,
                      const string &suffix) const;

@@ -62,7 +62,7 @@ function test_input_file {
     then
         echo "${red}not ok: $STXTYPER returned a non-zero exit value indicating a failure of the software${reset}"
         echo "#  $STXTYPER $options -n test/$test_base.fa > test/$test_base.got"
-        TEST_TEXT="$TEST_TEXT"$'\n'"Failed $test_base"
+        TEST_TEXT="$TEST_TEXT"$'\n'"${red}Failed $test_base${reset}"
         return 1
     else
         if ! diff -q "test/$test_base.expected" "test/$test_base.got"
@@ -73,7 +73,7 @@ function test_input_file {
             diff "test/$test_base.expected" "test/$test_base.got"
             echo "#  To approve run:"
             echo "#     mv test/$test_base.got test/$test_base.expected "
-            TEST_TEXT="$TEST_TEXT"$'\n'"Failed $test_base"
+            TEST_TEXT="$TEST_TEXT"$'\n'"${red}Failed $test_base${reset}"
             return 1
         else
             echo "${green}ok:${reset} test/$test_base.fa"
@@ -95,7 +95,7 @@ then
     diff "test/basic.nuc_out.expected" "test/basic.nuc_out.got"
     echo "#  To approve run:"
     echo "#     mv test/basic.nuc_out.got test/basic.nuc_out.expected "
-    TEST_TEXT="$TEST_TEXT"$'\n'"Failed basic --nucleotide_output test"
+    TEST_TEXT="$TEST_TEXT"$'\n'"${red}Failed basic --nucleotide_output test${reset}"
     FAILURES=$(( $FAILURES + 1 ))
 else 
     echo "${green}ok:${reset} --nucleotide_output test/basic.nuc_out.got options worked"
