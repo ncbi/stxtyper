@@ -4,5 +4,5 @@ NA	partial_contig_end	3	661	-	stx2_operon	Partial stx2 operon	plus	VIRULENCE	STX
 NA	stx1a	218	1444	+	stx1a_operon	stx1a operon	plus	VIRULENCE	STX_TYPE	STX1	STX1A	COMPLETE	1227	NA	NA	100.00	406	AAA98347.1,AAA71894.1	Shiga toxin stx1a	NA	NA
 NA	stx2_fs	2165	3232	+	stx2_operon	stx2 operon with frameshift	plus	VIRULENCE	STX_TYPE	STX2	STX2	FRAMESHIFT	1068	NA	NA	99.15	355	AAG01033.1,AAA16363.1	Shiga toxin stx2c	NA	NA
 NA	stx2_novel	216	1456	+	stx2_operon	Novel stx2 operon	plus	VIRULENCE	STX_TYPE	STX2	STX2	COMPLETE_NOVEL	1241	NA	NA	99.76	410	AAA19623.1,AAA16363.1	Shiga toxin stx2c	NA	NA
-NA	stx2_stop	694	1653	+	stx2_operon	stx2 operon with internal stop	plus	VIRULENCE	STX_TYPE	STX2	STX2	INTERNAL_STOP	960	NA	NA	91.25	320	AUM09788.1	Shiga toxin stx2h subunit A	NA	NA
+NA	stx2_stop	694	1635	+	stx2_operon	Partial stx2 operon	plus	VIRULENCE	STX_TYPE	STX2	STX2	PARTIAL_CONTIG_END	942	NA	NA	100.00	314	WAK53220.1	Shiga toxin stx2n subunit A	NA	NA
 NA	stx2c	1298	2538	-	stx2c_operon	stx2c operon	plus	VIRULENCE	STX_TYPE	STX2	STX2C	COMPLETE	1241	NA	NA	100.00	410	AAA16363.1,AAS07596.1	Shiga toxin stx2c	NA	NA

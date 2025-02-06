@@ -8,7 +8,7 @@ StxTyper is used to determine stx type from nucleotide sequence. Stx (Shiga-toxi
 
 # Installation
 
-Note StxTyper is included with [AMRFinderPlus](https://github.com/ncbi/amr/wiki) as of version 4.0 and is run by AMRFinderPlus when the `--organism Escherichia option is used`. If you have installed AMRFinderPlus you don't need to separately install StxTyper.
+Note StxTyper is included with [AMRFinderPlus](https://github.com/ncbi/amr/wiki) as of version 4.0 and is run by AMRFinderPlus when the `--organism Escherichia` option is used. If you have installed AMRFinderPlus you don't need to separately install StxTyper.
 
 ## Installing with Bioconda
 
@@ -93,6 +93,12 @@ StxTyper is included with several Docker images including the [ncbi/amr](https:/
 
 - `--blast_bin <path>` Directory to search for tblastn binary. Overrides environment variable `$BLAST_BIN` and the default PATH.
 
+- `--amrfinder` Print the output in the fields that match AMRFinderPlus output. [See below for details](#--amrfinder-output).
+
+- `--print_node` In the `--amrfinder` output format add the "Hierarchy node" as the last column. See the [field description in the AMRFinderPlus documentation](https://github.com/ncbi/amr/wiki/Running-AMRFinderPlus#fields) for details.
+
+- `--nucleotide_output <fasta_output_filename>` Print the nucleotide sequence of the identified operons to this file in FASTA format. Takes the sequence from _Target start_ to _Target stop_ and reverse-complements it if necessary to put it in the coding frame.
+
 - `-q` or `--quiet` Suppress the status messages normally written to STDERR.
 
 - `--log <log_file>` Error log file, appended and opened when you first run the application. This is used for debugging.
@@ -154,4 +160,34 @@ whole.
 empty if none aligned
 15. __B_coverage__ The percentage of the reference for the B subunit that is
 covered by the alignment, empty if none aligned
+
+### `--amrfinder` output
+
+This format of output matches the field names for AMRFinderPlus and is used when StxTyper is run as part of the AMRFinderPlus analysis pipeline. Note that AMRFinderPlus will include gene-based identification of Stx genes in separate rows. StxTyper will only output type calls for the operon as a whole.
+
+1. __Protein id__ Always NA for StxTyper which runs using translated blast
+   alignments against the nucleotide sequence.
+2. __Contig id__ The FASTA identifier for the contig where the operon was
+   found.
+3. __Start__ The 1-based coordinate of the first base of the identified operon or partial operon.
+4. __Stop__ The coordinate of the last base of the identified operon or partial operon.
+5. __Strand__ '+' or '-' to indicate if the coding sequence of the genes is on the forward or reverse strand.
+6. __Element symbol__ The operon symbol, corresponds to the "stx type" in the default output. For example 'stx2a_operon' or 'stx1_operon'
+7. __Element name__ A description of the identified operon, including the subtype or whether it was a partial or frameshift operon.
+8. __Scope__ Always 'plus' for StxTyper output corresponding to the [Scope](https://github.com/ncbi/amr/wiki/Interpreting-results#the-scope-column-and-the---plus-option) used for virulence genes by AMRFinderPlus.
+9. __Type__ Always 'VIRULENCE' for StxTyper output.
+10. __Subtype__ Always 'STX_TYPE' for StxTyper output.
+11. __Class__ Either STX1 or STX2 corresponding to the type of the stx operon.
+12. __Subclass__ The more detailed subtype of the operon if typeable.
+13. __Method__ Corresponds to the __operon__ field in standard output. See above for details.
+14. __Target length__ Calculated as __Stop__ - __Start__ or the length of the operon hit in nucleotide sequence.
+15. __Referemce sequence length__ Always empty for StxTyper output.
+16. __% Coverage of reference__ Always empty for StxTyper output.
+17. __% Identity to reference__ The amino-acid percent identity to the reference genes, does not include the intergenic spacer.
+18. __Alignment length__ The total amino-acid length of the subunit alignments.
+19. __Closest reference accession__ The closest reference accessions, two values separated by a ', ' if both subunits aligned.
+20. __Closest reference name__ The name of the closest reference operon.
+21. __HMM accession__ Always NA for StxTyper output since HMMs are not used in operon typing.
+22. __HMM description__ Always NA for StxTyper output
+23. __Hierarchy node__ [Optional] When the `--print_node` option is used this is the nodes in the [Reference Gene Hierarchy](https://www.ncbi.nlm.nih.gov/pathogens/genehierarchy/) for each of the subunits separated by '::' if there are more than one (e.g., stxB2a::stxA2c). Note that for some Stx operon types the A and B subunits may have different types in the hierarchy becuase some subunits can appear in multiple stx types.
 

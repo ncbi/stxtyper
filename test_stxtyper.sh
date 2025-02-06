@@ -104,7 +104,7 @@ fi
 test_input_file 'synthetics'
 FAILURES=$(( $? + $FAILURES ))
 
-test_input_file 'virulence_ecoli'
+test_input_file 'virulence_ecoli' '--threads 4'
 FAILURES=$(( $? + $FAILURES ))
 
 test_input_file 'cases'
