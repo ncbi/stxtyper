@@ -38,10 +38,10 @@ FAILURES=0
 TESTS=0
 TEST_TEXT=''
 
-echo "TERM=$TERM"
+# echo "TERM=$TERM"
 
 # some color macros
-if [ "$TERM" == "" ] || [ "$TERM" == "dumb" ]
+if [ "$TERM" == "" ] || [ "$TERM" == "dumb" ] || [ ! -t 1 ]
 then
     green='' # no colors
     red=''
