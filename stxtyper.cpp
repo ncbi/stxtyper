@@ -32,6 +32,7 @@
 * Dependencies: NCBI BLAST, gunzip (optional)
 *
 * Release changes:
+*  1.0.41 02/18/2025          Single subunit operon: PARTIAL_CONTIG_END/PARTIAL bug
 *  1.0.40 02/04/2025 PD-5231  PARTIAL_CONTIG_END < EXTENDED
 *  1.0.39 01/31/2025 PD-5231  suppress single-subunit operons overlappng with two-subunit operons
 *  1.0.38 01/30/2025 PD-5231  select matches to reference proteins as if the matches had been at nucleotide level
@@ -334,13 +335,13 @@ struct BlastAlignment
                               ? "FRAMESHIFT"
                               : stopCodon 
                                 ? "INTERNAL_STOP"
-                                : truncated () /*|| otherTruncated ()*/
+                                : truncated () || otherTruncated ()
                                   ? "PARTIAL_CONTIG_END"
                                   : debugP && verboseP && getRelCoverage () == 1.0
                                     ? "COMPLETE_SUBUNIT"
                                     : c_extended ()
                                       ? "EXTENDED"
-                                      : "PARTIAL_CONTIG_END"  // "PARTIAL"
+                                      : /*"PARTIAL_CONTIG_END"*/ "PARTIAL"
                            );
     #endif
       const char strand (targetStrand ? '+' : '-');
@@ -444,13 +445,11 @@ struct BlastAlignment
     { return    (targetStart           < 3 /*Locus::end_delta*/ && ((targetStrand && refStart)        || (! targetStrand && refEnd < refLen)))
              || (targetLen - targetEnd < 3 /*Locus::end_delta*/ && ((targetStrand && refEnd < refLen) || (! targetStrand && refStart)));
     }
-#if 0
   bool otherTruncated () const
     { constexpr size_t missed_max = intergenic_max + 3 * 20 /*min. domain length*/;  // PAR
       return    (targetStrand == (subunit == 'B') && targetStart           <= missed_max)
              || (targetStrand == (subunit == 'A') && targetLen - targetEnd <= missed_max);
     }
-#endif
   bool c_extended () const 
     {/*if (truncated ())  
         return false; */
@@ -974,7 +973,7 @@ struct ThisApplication final : ShellApplication
   void shellBody () const final
   {
     const string fName      = shellQuote (getArg ("nucleotide"));
-    const uint   gencode    =             /*arg2uint ("translation_table")*/ 11; 
+    const uint   gencode    =           /*arg2uint ("translation_table")*/ 11; 
                  input_name =             getArg ("name");
     const string output     =             getArg ("output");
           string blast_bin  =             getArg ("blast_bin");
