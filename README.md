@@ -220,13 +220,14 @@ This typing scheme is only applicable to complete operons defined as 100% covera
         * 98.5 % for stx2k and stx2l
         * 98 % for the other stx types
     * For the the types stx2a, stx2c, and stx2d, they are treated as one generalized type with a subtype declared if the operon has the following amino acids:
-<table>
-<caption style="caption-side:bottom">This table determines the exact stx type for the generalized "stx2acd" type, if an amino acid is present at those locations not on the chart then it may be called stx2, but is a novel subtype.</caption>
+<table style="margin: 0 auto">
 <tr><th>Stx type</th><th colspan=2>Subunit A</th><th>Subunit B</th></tr>
 <tr><th>Position</th><th>313</th><th>319</th><th>35 (354 on holotoxin alignment)</th></tr>
 <tr><th>stx2a</th><td>F/S</td><td>K/E</td><td>D</td></tr>
 <tr><th>stx2c</th><td>F  </td><td>K/E</td><td>N</td></tr>
 <tr><th>stx2d</th><td>S  </td><td>E  </td><td>N</td></tr>
+<caption style="caption-side:bottom">This table determines the exact stx type for the generalized "stx2acd" type, if an amino acid is present at those locations not on the chart then it may be called stx2, but is a novel subtype.</caption>
 </table>
+
 * If none of the above rules agree to define a subtype then it is a novel stx type. 
 
