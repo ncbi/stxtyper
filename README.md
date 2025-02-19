@@ -227,6 +227,7 @@ This typing scheme is only applicable to complete operons defined as 100% covera
 <tr><th>stx2c</th><td>F  </td><td>K/E</td><td>N</td></tr>
 <tr><th>stx2d</th><td>S  </td><td>E  </td><td>N</td></tr>
 </table>
+
     * This table determines the exact stx type for the generalized "stx2acd" type, if an amino acid is present at those locations not on the chart then it may be called stx2, but is a novel subtype.
 * If none of the above rules agree to define a subtype then it is a novel stx type. 
 
