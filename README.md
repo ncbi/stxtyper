@@ -117,6 +117,8 @@ These options are not expected to be used outside of the [AMRFinderPlus](https:/
 
 The output of StxTyper is a tab-delimited file with the following fields, all percent identity and coverage metrics are measured in proportion of amino-acids.
 
+Note that due to an oversight, some of the reference accessions listed in the output do not appear in the [Pathogen Detection Reference Gene Catalog](https://www.ncbi.nlm.nih.gov/pathogens/refgene/). The sequences are there, but associated with a different accession. This will be rectified with the next release of the AMRFinderPlus database / Reference Gene Catalog. Please email us at pd-help@ncbi.nlm.nih.gov if you have questions or need help with this.
+
 1. __target_contig__: The contig identifier from the input FASTA file
 2. __stx_type__: The stx type called by the algorithm, for "operon = COMPLETE"
    it will be stx plus two characters (e.g., stx1a), for other values of operon
