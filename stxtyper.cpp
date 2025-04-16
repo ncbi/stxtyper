@@ -429,7 +429,6 @@ struct BlastAlignment
     { return    (targetStart           < 3 /*Locus::end_delta*/ && ((targetStrand && refStart)        || (! targetStrand && refEnd < refLen)))
              || (targetLen - targetEnd < 3 /*Locus::end_delta*/ && ((targetStrand && refEnd < refLen) || (! targetStrand && refStart)));
     }
-#if 0
   bool otherTruncated () const
     { constexpr size_t missed_max = intergenic_max + 3 * 20 /*min. domain length*/;  // PAR
       return    (targetStrand == (subunit == 'B') && targetStart           <= missed_max)
