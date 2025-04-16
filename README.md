@@ -193,7 +193,6 @@ This format of output matches the field names for AMRFinderPlus and is used when
 22. __HMM description__ Always NA for StxTyper output
 23. __Hierarchy node__ [Optional] When the `--print_node` option is used this is the nodes in the [Reference Gene Hierarchy](https://www.ncbi.nlm.nih.gov/pathogens/genehierarchy/) for each of the subunits separated by '::' if there are more than one (e.g., stxB2a::stxA2c). Note that for some Stx operon types the A and B subunits may have different types in the hierarchy becuase some subunits can appear in multiple stx types.
 
-
 # Algorithm
 
 ## StxTyper operon detection
@@ -210,7 +209,7 @@ Alignments or operons that are < 80% identical to individual reference subunits 
 4.	EXTENDED is called when the whole reference protein aligns, but the stop codon is not present at the end of the alignment to the reference sequence.
 5.	PARTIAL is called for the remaining cases where < 100% of the reference sequences of both subunits align.
 
-## StxTyper typing algorithm
+## Subtyping algorithm
 
 This typing scheme is only applicable to complete operons defined as 100% coverage over 100% of the reference protein sequence for both subunits that are < 36-bp apart. 
 
@@ -232,4 +231,3 @@ This typing scheme is only applicable to complete operons defined as 100% covera
 </table>
 
 * If none of the above rules agree to define a subtype then it is a novel stx type. 
-

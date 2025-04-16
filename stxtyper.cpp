@@ -123,9 +123,7 @@ using namespace Common_sp;
 
 #include "common.inc"
 
-
 #undef PROT_MATCH  // 0 <=> nucleotide level matching to protein reference sequences  // PD-5231
-
 
 
 namespace 
@@ -309,6 +307,11 @@ struct BlastAlignment
       QC_IMPLY (! frameshift, length == targetSeq. size ());
       QC_ASSERT (stxType. size () == 2);
       QC_IMPLY (truncated (), partial ());
+
+    }
+  void saveText (ostream &os) const 
+    {
+      os << targetName << " (" << targetStart + 1 << '-' << targetEnd << ") " << refAccession <<  " (" << refStart + 1 << '-' << refEnd << ")" << '\n';
     }
   void saveText (ostream &os) const 
     { os << targetName << " (" << targetStart + 1 << '-' << targetEnd << ") " << refAccession <<  " (" << refStart + 1 << '-' << refEnd << ")" << '\n'; }
@@ -318,6 +321,7 @@ struct BlastAlignment
         return;
       const string stxType_reported (verboseP ? getGenesymbol () : (stxS + stxType. substr (0, 1)));
 
+     
       const string quality (frameshift 
                               ? "FRAMESHIFT"
                               : stopCodon 
@@ -330,6 +334,7 @@ struct BlastAlignment
                                       ? "EXTENDED"
                                       : "PARTIAL"
                            );
+
       const char strand (targetStrand ? '+' : '-');
       const double refCoverage = getRelCoverage () * 100.0;
       const double refIdentity = getIdentity ()    * 100.0; 
@@ -429,6 +434,7 @@ struct BlastAlignment
     { return    (targetStart           < 3 /*Locus::end_delta*/ && ((targetStrand && refStart)        || (! targetStrand && refEnd < refLen)))
              || (targetLen - targetEnd < 3 /*Locus::end_delta*/ && ((targetStrand && refEnd < refLen) || (! targetStrand && refStart)));
     }
+#if 0
   bool otherTruncated () const
     { constexpr size_t missed_max = intergenic_max + 3 * 20 /*min. domain length*/;  // PAR
       return    (targetStrand == (subunit == 'B') && targetStart           <= missed_max)
@@ -747,6 +753,7 @@ public:
     { ASSERT (al2);
       return double (al1->getAbsCoverage () + al2->getAbsCoverage ()) / double (al1->refLen + al2->refLen); 
     }
+
   bool perfect () const
     { ASSERT (al2);
       return    al1->perfect ()
@@ -964,6 +971,7 @@ struct ThisApplication final : ShellApplication
     
 		const string logFName (tmp + "/log"); 
     const string qcS (qc_on ? " -qc" : noString);
+
     // blast_bin
     if (blast_bin. empty ())
     	if (const char* s = getenv ("BLAST_BIN"))
