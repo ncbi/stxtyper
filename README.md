@@ -193,3 +193,43 @@ This format of output matches the field names for AMRFinderPlus and is used when
 22. __HMM description__ Always NA for StxTyper output
 23. __Hierarchy node__ [Optional] When the `--print_node` option is used this is the nodes in the [Reference Gene Hierarchy](https://www.ncbi.nlm.nih.gov/pathogens/genehierarchy/) for each of the subunits separated by '::' if there are more than one (e.g., stxB2a::stxA2c). Note that for some Stx operon types the A and B subunits may have different types in the hierarchy becuase some subunits can appear in multiple stx types.
 
+
+# Algorithm
+
+## StxTyper operon detection
+StxTyper (https://github.com/ncbi/stxtyper) uses translated BLAST (Camacho et al., 2009) alignments to a reference database of StxA and StxB protein sequences that is included with StxTyper and as part of the NCBI Pathogen Detection Reference Gene Catalog (https://www.ncbi.nlm.nih.gov/pathogens/refgene). Alignments are screened according to the following algorithm to determine whether they are full length, and only complete operons are typed down to the subtype (e.g., stx1c, stx2n) using the algorithm described below. Those that are not complete operons or cannot be fully typed by the scheme will be assigned stx types of stx1 or stx2, or if indeterminate, stx. 
+
+StxTyper uses the following algorithm to identify putatively incomplete or non-functional operons. These categories are included in the “operon” field of StxTyper and also appear in the AMRFinderPlus “Method” field when run by AMRFinderPlus. Values of FRAME_SHIFT, INTERNAL_STOP, PARTIAL_CONTIG_END, EXTENDED, or PARTIAL indicate putatively incomplete or non-functional and therefore not subtyped operons. Operons that don’t meet any of these characteristics are designated either COMPLETE, COMPLETE_NOVEL, or AMBIGUOUS and, where possible given the complete operon typing scheme described below typed down to the subtype (e.g., stx2a). Stx operons that are putatively incomplete or non-functional are assigned to the type level (i.e., stx1 or stx2) if possible.
+
+Algorithm for determining if operons are complete
+Alignments or operons that are < 80% identical to individual reference subunits or < 80% identical to both A and B subunits combined are dropped from consideration. The putatively non-functional categories are determined in this order:
+
+1.	FRAME_SHIFT is called when there are two consecutive BLAST hits to the same reference with distance < 10-bp in different reading frames. Because these blast matches to the whole reference protein are split into multiple alignments the numbers for percent identity and alignment length are calculated from the identified alignments and may not be what is expected.
+2.	INTERNAL_STOP is called when there is a ‘*’ character (stop codon) any place in the query portion of the alignment other than at the last position of the reference sequence.
+3.	PARTIAL_CONTIG_END is used to differentiate operons that may be split by assembly or sequencing issues at the end of a contig versus PARTIAL operons internal to contigs that are more likely to be incomplete in reality. PARTIAL_CONTIG_END operons are identified by alignments that terminate internal to the reference sequences < 3-bp from the end of a contig. A single-subunit operon is also identified as PARTIAL_CONTIG_END if the length of the unmatched portion of the contig in the same orientation as the missing subunit is < 36-bp (maximum allowed intergenic region) + 60-bp (minimum coding length to determine a subunit alignment has been missed) from the end of the contig. 
+4.	EXTENDED is called when the whole reference protein aligns, but the stop codon is not present at the end of the alignment to the reference sequence.
+5.	PARTIAL is called for the remaining cases where < 100% of the reference sequences of both subunits align.
+
+## StxTyper typing algorithm
+
+This typing scheme is only applicable to complete operons defined as 100% coverage over 100% of the reference protein sequence for both subunits that are < 36-bp apart. 
+
+*	Compute the combined % identity as the sum of identities of the both proteins / sum of reference lengths of both proteins.
+* A subtype is declared if
+    * Both subunits are of the same stx type, considering stx2a, stx2c and stx2d as one generalized type “stx2acd”
+    * Intergenic region between subunit A and subunit B is <= 36 bp
+    * The combined % identity >= the cutoff which is:
+        * 98.3 % for stx1 types
+        * 98.5 % for stx2k and stx2l
+        * 98 % for the other stx types
+    * For the the types stx2a, stx2c, and stx2d, they are treated as one generalized type with a subtype declared if the operon has the following amino acids. If an amino acid is present at those locations or a combination not on the chart than the type will be stx2 and the "operon" field will contain COMPLETE_NOVEL instead of COMPLETE.
+<table style="margin: 0 auto">
+<tr><th>Stx type</th><th colspan=2>Subunit A</th><th>Subunit B</th></tr>
+<tr><th>Position</th><th>313</th><th>319</th><th>35 (354 on holotoxin alignment)</th></tr>
+<tr><th>stx2a</th><td>F/S</td><td>K/E</td><td>D</td></tr>
+<tr><th>stx2c</th><td>F  </td><td>K/E</td><td>N</td></tr>
+<tr><th>stx2d</th><td>S  </td><td>E  </td><td>N</td></tr>
+</table>
+
+* If none of the above rules agree to define a subtype then it is a novel stx type. 
+

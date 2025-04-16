@@ -32,6 +32,9 @@
 * Dependencies: NCBI BLAST, gunzip (optional)
 *
 * Release changes:
+
+*  1.0.42 02/20/2025 PD-5246  bioinformatically functional operons are preferred over weak operons disregarding the percent of identity
+*  1.0.41 02/18/2025          Single subunit operon: PARTIAL_CONTIG_END/PARTIAL bug
 *  1.0.40 02/04/2025 PD-5231  PARTIAL_CONTIG_END < EXTENDED
 *  1.0.39 01/31/2025 PD-5231  suppress single-subunit operons overlappng with two-subunit operons
 *  1.0.38 01/30/2025 PD-5231  select matches to reference proteins as if the matches had been at nucleotide level
@@ -121,7 +124,7 @@ using namespace Common_sp;
 #include "common.inc"
 
 
-#undef PROT_MATCH  // Nucleotide level matching to protein reference sequences  // PD-5231
+#undef PROT_MATCH  // 0 <=> nucleotide level matching to protein reference sequences  // PD-5231
 
 
 
@@ -308,41 +311,25 @@ struct BlastAlignment
       QC_IMPLY (truncated (), partial ());
     }
   void saveText (ostream &os) const 
-    {
-      os << targetName << " (" << targetStart + 1 << '-' << targetEnd << ") " << refAccession <<  " (" << refStart + 1 << '-' << refEnd << ")" << '\n';
-    }
+    { os << targetName << " (" << targetStart + 1 << '-' << targetEnd << ") " << refAccession <<  " (" << refStart + 1 << '-' << refEnd << ")" << '\n'; }
   void saveTsvOut (TsvOut& td,
                    bool verboseP) const 
     { if (! td. live ())
         return;
       const string stxType_reported (verboseP ? getGenesymbol () : (stxS + stxType. substr (0, 1)));
-    #if 0
+
       const string quality (frameshift 
                               ? "FRAMESHIFT"
                               : stopCodon 
                                 ? "INTERNAL_STOP"
-                                : verboseP && getRelCoverage () == 1.0
-                                  ? "COMPLETE_SUBUNIT"
-                                  : c_extended ()
-                                    ? "EXTENDED"
-                                    : truncated () || otherTruncated ()
-                                      ? "PARTIAL_CONTIG_END"
-                                      : "PARTIAL"
-                           );
-    #else
-      const string quality (frameshift 
-                              ? "FRAMESHIFT"
-                              : stopCodon 
-                                ? "INTERNAL_STOP"
-                                : truncated () /*|| otherTruncated ()*/
+                                : truncated () || otherTruncated ()
                                   ? "PARTIAL_CONTIG_END"
                                   : debugP && verboseP && getRelCoverage () == 1.0
                                     ? "COMPLETE_SUBUNIT"
                                     : c_extended ()
                                       ? "EXTENDED"
-                                      : "PARTIAL_CONTIG_END"  // "PARTIAL"
+                                      : "PARTIAL"
                            );
-    #endif
       const char strand (targetStrand ? '+' : '-');
       const double refCoverage = getRelCoverage () * 100.0;
       const double refIdentity = getIdentity ()    * 100.0; 
@@ -368,8 +355,8 @@ struct BlastAlignment
            << subclass         //12 "Subclass"
            << quality          //13 "Method"  
            << targetEnd - targetStart /*targetAlign*/      //14 "Target length" 
-           << na /*refLen*/  //15 "Reference sequence length"
-           << na /*refCoverage*/      //16 "% Coverage of reference sequence"
+           << na /*refLen*/    //15 "Reference sequence length"
+           << na /*refCoverage*/   //16 "% Coverage of reference sequence"
            << refIdentity      //17 "% Identity to reference sequence"
            << length           //18 "Alignment length"
            << refAccession     //19 "Accession of closest sequence"
@@ -419,10 +406,8 @@ struct BlastAlignment
       ASSERT (targetStart > prev. targetStart);
       targetStart = prev. targetStart;
       if (targetStrand)
-      //refStart = prev. refStart;
         minimize (refStart, prev. refStart);
       else
-      //refEnd = prev. refEnd;
         maximize (refEnd, prev. refEnd);
       // Approximately
       length += prev. length;  
@@ -450,19 +435,13 @@ struct BlastAlignment
       return    (targetStrand == (subunit == 'B') && targetStart           <= missed_max)
              || (targetStrand == (subunit == 'A') && targetLen - targetEnd <= missed_max);
     }
-#endif
+
   bool c_extended () const 
-    {/*if (truncated ())  
-        return false; */
-      return    ! refStart             // N-terminus is complete
+    { return    ! refStart             // N-terminus is complete
              && refEnd + 1 == refLen;  // Only "*" (stop codon) is missing
     }
   bool partial () const
-    { return    getRelCoverage () < 1.0 
-           //&& ! c_extended ()
-             ;   
-    }
-#ifdef PROT_MATCH
+    { return getRelCoverage () < 1.0; }
   bool perfect () const
     { return    ! truncated ()
              && ! partial ()
@@ -470,7 +449,7 @@ struct BlastAlignment
              && ! frameshift
              && ! stopCodon;
     }
-#endif
+
   bool insideEq (const BlastAlignment &other,
                  size_t slack_arg) const
     { return    targetStrand            == other. targetStrand
@@ -604,7 +583,7 @@ struct Operon
         const bool novel =    al1->stxClass != al2->stxClass 
                            || getIdentity () < stxClass2identity [al1->stxClass]
                            || stxType. size () <= 1;
-      #if 1
+
         const string quality =    al1->frameshift
                                || al2->frameshift
                                  ? "FRAMESHIFT"
@@ -626,29 +605,7 @@ struct Operon
                                                    ? "AMBIGUOUS"
                                                    : standard + "_NOVEL"
                                                  : standard;
-      #else
-        const string quality =    al1->frameshift
-                               || al2->frameshift
-                                 ? "FRAMESHIFT"
-                                 :    al1->stopCodon 
-                                   || al2->stopCodon 
-                                   ? "INTERNAL_STOP"
-                                   :    al1->truncated () 
-                                     || al2->truncated ()
-                                     ? "PARTIAL_CONTIG_END"
-                                     :    al1->c_extended ()
-                                       || al2->c_extended ()
-                                       ? "EXTENDED" 
-                                       :    al1->partial ()
-                                         || al2->partial ()
-                                         ? "PARTIAL"  
-                                         // complete operon types
-                                         : novel
-                                           ? xs ()
-                                             ? "AMBIGUOUS"
-                                             : standard + "_NOVEL"
-                                           : standard;
-      #endif
+
         if (! verboseP)
         {
           ASSERT (stxType. size () <= 2);
@@ -690,10 +647,10 @@ struct Operon
              << "STX_TYPE"        //10 "Element subtype"
              << subclass. substr (0, 4)   //11 "Class"
              << subclass          //12 "Subclass"
-             << quality        //13 "Method"  
+             << quality           //13 "Method"  
              << targetAlign       //14 "Target length" 
-             << na /*refLen*/  //15 "Reference sequence length"
-             << na /*refCoverage*/  //16 "% Coverage of reference sequence"
+             << na /*refLen*/     //15 "Reference sequence length"
+             << na /*refCoverage*/ //16 "% Coverage of reference sequence"
              << refIdentity       //17 "% Identity to reference sequence"
              << alignmentLen      //18 "Alignment length"
              << refAccessions     //19 "Accession of closest sequence"        // PD-5209
@@ -791,13 +748,12 @@ public:
     { ASSERT (al2);
       return double (al1->getAbsCoverage () + al2->getAbsCoverage ()) / double (al1->refLen + al2->refLen); 
     }
-#ifdef PROT_MATCH
   bool perfect () const
     { ASSERT (al2);
       return    al1->perfect ()
              && al2->perfect ();
     }
-#endif
+
   bool insideEq (const Operon &other,
                  size_t slack_arg) const
     { return    al1->targetStrand            == other. al1->targetStrand
@@ -850,10 +806,10 @@ public:
 void goodBlasts2operons (const VectorPtr<BlastAlignment> &goodBlastAls, 
                          Vector<Operon> &operons, 
                          bool sameClass,
-                         bool strong,
+                         ebool strong,
                          TsvOut &logTd)
 {
-  IMPLY (sameClass, strong);
+  IMPLY (sameClass, strong == etrue);
   
   LOG ("\nGood blasts:");
 
@@ -894,13 +850,26 @@ void goodBlasts2operons (const VectorPtr<BlastAlignment> &goodBlastAls,
       if (! al1->targetStrand)
         swap (al1, al2);
       if (   al1->targetEnd <= al2->targetStart  
-          && al2->targetStart - al1->targetEnd <= intergenic_max * (strong ? 1 : 2)  // PAR  // PD-4897
+          && al2->targetStart - al1->targetEnd <= intergenic_max * (strong == efalse ? 2 : 1)  // PAR  // PD-4897
          )
       {
         Operon op (*al1, *al2);
         LOG ("Operon: " + to_string (op. getIdentity ()) + " " + to_string (stxClass2identity [op. al1->stxClass]) + ":");
         op. saveTsvOut (logTd, true);  
-        if (   ! strong 
+      #if 1
+        bool good = false;
+        switch (strong)
+        {
+          case etrue: good =    op. getIdentity () >= stxClass2identity [op. al1->stxClass]
+                             && op. getIdentity () >= stxClass2identity [op. al2->stxClass];
+            break;
+          case enull: good = op. perfect ();
+            break;
+          default: good = true;
+        }
+        if (good)
+      #else
+        if (   strong != etrue
             || (   op. getIdentity () >= stxClass2identity [op. al1->stxClass]
                 && op. getIdentity () >= stxClass2identity [op. al2->stxClass]
               #ifdef PROT_MATCH
@@ -908,6 +877,7 @@ void goodBlasts2operons (const VectorPtr<BlastAlignment> &goodBlastAls,
               #endif
                )
            )
+      #endif
         {
           operons << std::move (op);
           LOG ("Added");
@@ -974,7 +944,7 @@ struct ThisApplication final : ShellApplication
   void shellBody () const final
   {
     const string fName      = shellQuote (getArg ("nucleotide"));
-    const uint   gencode    =             /*arg2uint ("translation_table")*/ 11; 
+    const uint   gencode    =           /*arg2uint ("translation_table")*/ 11; 
                  input_name =             getArg ("name");
     const string output     =             getArg ("output");
           string blast_bin  =             getArg ("blast_bin");
@@ -995,8 +965,6 @@ struct ThisApplication final : ShellApplication
     
 		const string logFName (tmp + "/log"); 
     const string qcS (qc_on ? " -qc" : noString);
-
-
     // blast_bin
     if (blast_bin. empty ())
     	if (const char* s = getenv ("BLAST_BIN"))
@@ -1196,15 +1164,18 @@ struct ThisApplication final : ShellApplication
     Vector<Operon> operons;
 
     LOG ("\nSame type operons:");
-    goodBlasts2operons (goodBlastAls, operons, true, true, logTd);
+    goodBlasts2operons (goodBlastAls, operons, true, etrue, logTd);
     
     goodBlastAls. sort (BlastAlignment::less);
 
     LOG ("\nStrong operons:");
-    goodBlasts2operons (goodBlastAls, operons, false, true, logTd);
+    goodBlasts2operons (goodBlastAls, operons, false, etrue, logTd);
 
-    LOG ("\nWeak operons:");
-    goodBlasts2operons (goodBlastAls, operons, false, false, logTd);
+    LOG ("\nWeak complete operons:");
+    goodBlasts2operons (goodBlastAls, operons, false, enull, logTd);
+
+    LOG ("\nWeak non-complete operons:");
+    goodBlasts2operons (goodBlastAls, operons, false, efalse, logTd);
    	  
   	LOG ("\ngoodOperons");
     Vector<Operon> goodOperons;
@@ -1275,27 +1246,7 @@ struct ThisApplication final : ShellApplication
      	if (al1->getIdentity () < identity_min)
      	  continue;
       Operon op (*al1);
-    #if 0
-      goodOperons << std::move (op);
-      FFOR_START (size_t, j, i + 1, goodBlastAls. size ())
-      {
-        const BlastAlignment* al2 = goodBlastAls [j];
-        ASSERT (al2);          
-        if (! (   al2->targetName   == al1->targetName
-               && al2->targetStrand == al1->targetStrand
-              )
-           )
-          break;
-        // Use Operon::betterEq() ??!
-        if (   ! al2->reported
-            && al2->insideEq (*al1, 3 * slack)  // PAR
-            && (   al2->stxType [0] == al1->stxType [0] 
-                || al1->getIdentity () >= al2->getIdentity ()  
-               )
-           )
-          var_cast (al2) -> reported = true;
-      }
-    #else
+
       bool good = true;
       for (const Operon& op_good : goodOperons)
         if (op_good. betterEq (op))  
@@ -1305,7 +1256,6 @@ struct ThisApplication final : ShellApplication
         }
       if (good)
         goodOperons << std::move (op);
-    #endif
     }
 
     // Report
@@ -1337,10 +1287,7 @@ struct ThisApplication final : ShellApplication
 };
 
 
-
 }  // namespace
-
-
 
 
 int main (int argc, 
