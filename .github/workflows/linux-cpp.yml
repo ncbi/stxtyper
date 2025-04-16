@@ -27,7 +27,6 @@ jobs:
             ./*
             test/* 
         retention-days: 14
-
   arm_linux:
     runs-on: ubuntu-24.04-arm
     steps:

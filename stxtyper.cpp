@@ -32,6 +32,7 @@
 * Dependencies: NCBI BLAST, gunzip (optional)
 *
 * Release changes:
+
 *  1.0.42 02/20/2025 PD-5246  bioinformatically functional operons are preferred over weak operons disregarding the percent of identity
 *  1.0.41 02/18/2025          Single subunit operon: PARTIAL_CONTIG_END/PARTIAL bug
 *  1.0.40 02/04/2025 PD-5231  PARTIAL_CONTIG_END < EXTENDED
@@ -316,6 +317,7 @@ struct BlastAlignment
     { if (! td. live ())
         return;
       const string stxType_reported (verboseP ? getGenesymbol () : (stxS + stxType. substr (0, 1)));
+
       const string quality (frameshift 
                               ? "FRAMESHIFT"
                               : stopCodon 
@@ -432,6 +434,7 @@ struct BlastAlignment
       return    (targetStrand == (subunit == 'B') && targetStart           <= missed_max)
              || (targetStrand == (subunit == 'A') && targetLen - targetEnd <= missed_max);
     }
+
   bool c_extended () const 
     { return    ! refStart             // N-terminus is complete
              && refEnd + 1 == refLen;  // Only "*" (stop codon) is missing
@@ -445,6 +448,7 @@ struct BlastAlignment
              && ! frameshift
              && ! stopCodon;
     }
+
   bool insideEq (const BlastAlignment &other,
                  size_t slack_arg) const
     { return    targetStrand            == other. targetStrand
@@ -578,6 +582,7 @@ struct Operon
         const bool novel =    al1->stxClass != al2->stxClass 
                            || getIdentity () < stxClass2identity [al1->stxClass]
                            || stxType. size () <= 1;
+
         const string quality =    al1->frameshift
                                || al2->frameshift
                                  ? "FRAMESHIFT"
@@ -599,6 +604,7 @@ struct Operon
                                                    ? "AMBIGUOUS"
                                                    : standard + "_NOVEL"
                                                  : standard;
+
         if (! verboseP)
         {
           ASSERT (stxType. size () <= 2);
@@ -746,6 +752,7 @@ public:
       return    al1->perfect ()
              && al2->perfect ();
     }
+
   bool insideEq (const Operon &other,
                  size_t slack_arg) const
     { return    al1->targetStrand            == other. al1->targetStrand
@@ -957,8 +964,6 @@ struct ThisApplication final : ShellApplication
     
 		const string logFName (tmp + "/log"); 
     const string qcS (qc_on ? " -qc" : noString);
-
-
     // blast_bin
     if (blast_bin. empty ())
     	if (const char* s = getenv ("BLAST_BIN"))
@@ -1240,6 +1245,7 @@ struct ThisApplication final : ShellApplication
      	if (al1->getIdentity () < identity_min)
      	  continue;
       Operon op (*al1);
+
       bool good = true;
       for (const Operon& op_good : goodOperons)
         if (op_good. betterEq (op))  
@@ -1280,10 +1286,7 @@ struct ThisApplication final : ShellApplication
 };
 
 
-
 }  // namespace
-
-
 
 
 int main (int argc, 
