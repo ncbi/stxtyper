@@ -155,6 +155,16 @@ void errorExitStr (const string &msg);
   // For debugger: should not be inline
   // Invokes: throw logic_error
 
+inline void reportException (const string &msg,
+                             const exception &e,
+                             bool force)
+  { const string s (msg + ": " + e. what ());
+    if (force)
+      cerr << s << endl;
+    else
+      throw runtime_error (s);
+  }    	    	
+
 
 void sleepNano (long nanoSec);
 
@@ -2111,10 +2121,6 @@ public:
       saveText (oss);
       return oss. str ();
     }
-#if 0
-  void trace (ostream& os,
-              const string& title) const;
-#endif
   virtual void saveXml (Xml::File& /*f*/) const 
     { throwf ("Root::saveXml() is not implemented"); }
   virtual Json* toJson (JsonContainer* /*parent_arg*/,
