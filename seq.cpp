@@ -35,6 +35,7 @@
 #undef NDEBUG
 
 #include "seq.hpp"
+#include "graph.hpp"
 
 #include "common.inc"
 
@@ -148,12 +149,12 @@ void Seq::printCase (ostream &os,
 {
   os << ">" << name;
 
-  CONST_ITER (string, it, seq)
+  FFOR (size_t, i, seq. size ())
   {
-    if ((size_t) (it - seq. begin ()) % fastaLineLen == 0)
+    if (i % fastaLineLen == 0)
     	os << endl;
 
-    char c = *it;
+    char c = seq [i];
     if (makeUpper)
      	c = toUpper (c);
     os << c;
@@ -370,43 +371,6 @@ void _SEQ_COLLECTION::SaveDir (const char* DirName) const
 {
   ForCollection (i, *this)
     SaveSeq (GetSeq (i), DirName);
-}
-
-
-
-byte* String2Qual (char* S,
-                   size_t  Len)
-{
-  ASSERT (S != nullptr);
-
-
-  if (StrIsEmpty (S))
-    return nullptr;
-
-
-  byte* Qual = NewByteArray (Len);
-  ASSERT (Qual != nullptr);
-
-
-  char* S1 = S;
-  For (i, Len)
-    if (StrIsBlank (S1))
-      Qual [i] = 0;  // ??
-    else
-      {
-        const char* S2 = StrChop (S1, " ");
-        uint Score;
-        if (sscanf (S2, "%u", & Score) != 1 ||
-            Score > 99)
-          {
-            printf ("%s\n", S2);
-            ERROR;
-          }
-        Qual [i] = Score;
-      }
-
-
-  return Qual;
 }
 #endif
 
@@ -865,8 +829,7 @@ uchar wild2nucleotides (char wildNucleotide,
       Case 'd': a = true;           g = true; t = true;
       Case 'b':           c = true; g = true; t = true;
       Case 'n': a = true; c = true; g = true; t = true;
-      Default: printf ("!%c! %d\n", wildNucleotide, wildNucleotide);
-               ERROR;
+      Default: throw runtime_error ("Bad wildNucleotide: " + to_string ((int) wildNucleotide));
     }
 
 
@@ -1652,59 +1615,6 @@ bool Dna::GoodQual () const
 
 
   return true;
-}
-
-
-
-void Dna::CopyQual (const PHRED_SCORE* SourceQual)
-{
-  ASSERT (SourceQual != nullptr);
-
-
-  CreateQual ();
-  ForString (i, seq)
-    Qual [i] = SourceQual [i];
-  if (! GoodQual ())
-    {          
-      printf ("%s\n", Name);
-      ERROR;
-    }
-}
-
-
-
-void Dna::ReadQual (const char* FName)
-{
-  ASSERT (Qual == nullptr);
-  ASSERT (! StrIsEmpty (FName));
-
-
-  // F
-  FILE* F = fopen (FName, "r");
-  ASSERT (F != nullptr);
-
-  char C;
-  if (fscanf (F, "%c", & C) != 1)
-    ERROR;
-  if (C != '>')
-    ERROR
-  SkipLine (F);
-
-
-  // Qual
-  CreateQual ();
-
-  uint Score;
-  ForString (i, seq)
-    if (fscanf (F, "%u", & Score) == 1)
-      Qual [i] = Score;
-    else
-      ERROR;
-
-  ASSERT (GoodQual ());
-
-
-  fclose (F);
 }
 
 
@@ -4486,7 +4396,65 @@ void Align::printAlignment (const string &seq1,
 
 
 
+// Interval
+
+void Interval::qc () const 
+{
+  if (! qc_on)
+    return;
+  Root::qc ();
+    
+  QC_ASSERT ((start == no_index) == (stop == no_index));
+  if (empty ())
+    return;
+  
+  QC_ASSERT (valid ());
+}
+
+
+
+bool Interval::operator< (const Interval& other) const
+{ 
+  LESS_PART (*this, other, strand);
+  LESS_PART (*this, other, start);
+  LESS_PART (*this, other, stop);
+  return false;
+}
+
+
+
+void Interval::extendStart (size_t offset)
+{
+  if (strand == -1)
+    stop += offset;
+  else
+  {
+    ASSERT (start >= offset);
+    start -= offset;
+  }
+}
+
+
+
+void Interval::extendStop (size_t offset)
+{
+  if (strand == -1)
+  {
+    ASSERT (start >= offset);
+    start -= offset;
+  }
+  else
+    stop += offset;
+}
+
+
+
+
 // Disruption
+
+const StringVector Disruption::typeNames {"none", "smooth", "fs", "del", "ins"};
+
+
 
 void Disruption::qc () const 
 {
@@ -4495,17 +4463,157 @@ void Disruption::qc () const
   Root::qc ();
     
   if (empty ())
+  {    
+    QC_ASSERT (! prev);
+    QC_ASSERT (! next);
+    QC_ASSERT (prev_start == no_index);
+    QC_ASSERT (next_stop  == no_index);
     return;
+  }
     
-  QC_ASSERT (prev_qend   != no_index);
-  QC_ASSERT (prev_send   != no_index);
-  QC_ASSERT (next_qstart != no_index);
-  QC_ASSERT (next_sstart != no_index);
+  QC_ASSERT (prev);
+  QC_ASSERT (next);
+  QC_ASSERT (! prev->merged);
+  QC_ASSERT (! next->merged);
+  QC_ASSERT (prev_start <= prev->length);
+  QC_ASSERT (next_stop  <= next->length);
+  QC_IMPLY (sameHsp (), prev_start <= next_stop);
+  QC_ASSERT (prev->blastx ());
+  QC_ASSERT (next->blastx ());
+  QC_ASSERT (prev->qseqid == next->qseqid);
+  QC_ASSERT (prev->sseqid == next->sseqid);
+  QC_ASSERT (prev->qlen == next->qlen);
+  QC_ASSERT (prev->slen == next->slen);
+  QC_ASSERT (prev->sInt. strand == next->sInt. strand);
   
-  QC_ASSERT (prev_qend <= next_qstart);
-  QC_ASSERT (sstrand);
+  {
+    const Interval qInt_ (qInt ());
+    QC_ASSERT (! qInt_. empty ());
+    qInt_. qc ();
+  }
   
-  QC_IMPLY (smooth (), ! frameshift ());
+  {
+    const Interval sInt_ (sInt ());
+    QC_ASSERT (! sInt_. empty ());
+    sInt_. qc ();
+  }
+
+  switch (type ())
+  {
+    case eFrameshift: 
+      QC_ASSERT (! sameHsp ()); 
+      break;
+    case eInsertion:  
+      QC_ASSERT (prev_start); 
+      QC_ASSERT (qInt (). start);
+      break;
+    default: 
+      break;
+  }
+  QC_IMPLY (sameHsp () && prev_start == next_stop, type () == eSmooth);
+}
+
+
+
+void Disruption::saveText (ostream &os) const 
+{ 
+  os << "Disruption:";
+  if (empty ())
+    os << "empty";
+  else
+  { 
+    os << qInt () << ':' << sInt ();
+    if (sStopCodon ())
+      os << "/*";
+  }
+}
+
+
+
+bool Disruption::operator< (const Disruption &other) const
+{
+  ASSERT (! empty ());
+  ASSERT (! other. empty ());
+  
+  ASSERT (sInt (). strand == other. sInt (). strand);
+  LESS_PART (*this, other, qInt ());
+  LESS_PART (*this, other, sInt ());
+  return false;
+}
+
+
+
+bool Disruption::sStopCodon () const
+{ 
+  ASSERT (! empty ());
+  return    sameHsp () 
+         && contains (prev->sseq. substr (prev_start, next_stop - prev_start), '*'); 
+}
+
+
+
+Interval Disruption::qInt () const
+{ 
+  ASSERT (! empty ());
+  return Interval ( prev->pos2q (prev_start, true)
+                  , next->pos2q (next_stop,  true)
+                  , 0
+                  );
+}
+
+
+
+Interval Disruption::sInt () const
+{ 
+  ASSERT (! empty ());
+  Interval in ( prev->pos2s (prev_start, true)
+              , next->pos2s (next_stop,  true)
+              , prev->sInt. strand
+              );
+  if (in. strand == -1)
+    swap (in. start, in. stop);
+  return in;
+}
+
+
+
+string Disruption::genesymbol_raw () const
+{
+  ASSERT (! empty ());
+  
+  const Type t = type ();
+  ASSERT (t != eSmooth);
+  
+  Interval qInt_ (qInt ());
+  Interval sInt_ (sInt ());
+  switch (t)
+  {
+    case eFrameshift:
+      qInt_. stop = qInt_. start;
+      qInt_. extendStop (1);
+      if (sInt_. strand == 1)
+        sInt_. stop = prev->slen;
+      else
+        sInt_. start = 0;
+      break;
+    case eInsertion:
+      ASSERT (! qInt_. len ());
+      qInt_. extendStart (1);
+      sInt_. extendStart (3);
+      break;
+    default:
+      break;
+  }
+  
+  string s (        typeNames [t]
+            + "_" + to_string (qInt_. start) + "_" + to_string (qInt_. stop)
+            + "_" + to_string (sInt_. start) + "_" + to_string (sInt_. stop)
+            + "_" + to_string (sInt_. strand == 1 ? 1 : 0)
+           );
+  if (sStopCodon ())
+    s += stopSuf;
+    
+  return s;
 }
 
 
@@ -4527,7 +4635,7 @@ Hsp::Hsp (const string &blastLine,
   {
     {
       istringstream iss (blastLine);
-      iss >> qseqid >> sseqid >> qstart >> qend >> qlen >> sstart >> send >> slen >> qseq >> sseq;
+      iss >> qseqid >> sseqid >> qInt. start >> qInt. stop >> qlen >> sInt. start >> sInt. stop >> slen >> qseq >> sseq;
     }
     QC_ASSERT (! sseq. empty ());	
 
@@ -4544,36 +4652,36 @@ Hsp::Hsp (const string &blastLine,
 
     if (! sProt)
     {
-      sstrand = 1;
+      sInt. strand = 1;
       if (qProt)
       {
-        QC_ASSERT (sstart != send);
-        if (sstart > send)
+        QC_ASSERT (sInt. start != sInt. stop);
+        if (sInt. start > sInt. stop)
         {
-          sstrand = -1;
-          swap (sstart, send);
+          sInt. strand = -1;
+          swap (sInt. start, sInt. stop);
         }
       }
       else
       {
-        QC_ASSERT (qstart != qend);
-        if (qstart > qend)
+        QC_ASSERT (qInt. start != qInt. stop);
+        if (qInt. start > qInt. stop)
         {
-          swap (qstart, qend);
+          swap (qInt. start, qInt. stop);
           if (! aProt)
           {
           	reverseDna (sseq);
           	reverseDna (qseq);
           }
-        	sstrand = -1;
+        	sInt. strand = -1;
         }
       }
     }
     	      
-    QC_ASSERT (qstart >= 1);
-    QC_ASSERT (sstart >= 1);
-    qstart--;
-    sstart--;
+    QC_ASSERT (qInt. start >= 1);
+    QC_ASSERT (sInt. start >= 1);
+    qInt. start--;
+    sInt. start--;
     
     finishHsp (qStopCodon, bacterialStartCodon);
   }
@@ -4590,55 +4698,51 @@ void Hsp::finishHsp (bool qStopCodon,
 {
   a2q = (aProt && ! qProt ? 3 : 1);
   a2s = (aProt && ! sProt ? 3 : 1);
-  
-  c_complete = enull;
-  if (qStopCodon)
-  {
-    QC_ASSERT (qProt);
-    if (qend == qlen)
+
+
+  if (! merged)
+  {  
+    moveDashesRight ();    
+
+    c_complete = enull;
+    if (qStopCodon)
     {
-      if (qseq. back () != '*')
-        throw logic_error ("Ending stop codon is expected");
-      c_complete = toEbool (sseq. back () == '*');
-      do  // To match '*'-less aligment
+      QC_ASSERT (qProt);
+      if (qInt. stop == qlen)
       {
-        ASSERT (! sseq. empty ());
-        // s
-        sseq. erase (sseq. size () - 1);
-        if (sstrand == 1)
-          send -= a2s;
-        else
-          sstart += a2s;
-        // q
-        qseq. erase (qseq. size () - 1);
-        qend--;
-        QC_ASSERT (! qseq. empty ());
+        if (qseq. back () != '*')
+          throw logic_error ("Ending stop codon is expected");
+        c_complete = toEbool (sseq. back () == '*');
+      //do  // To match trailing-'*'-less aligment  ??
+        {
+          ASSERT (! sseq. empty ());
+          eraseQseqBack ();
+          eraseSseqBack ();
+          QC_ASSERT (! sseq. empty ());
+        }
+      //while (sseq. back () != qseq. back ());  ??
       }
-      while (sseq. back () != qseq. back ());
+      else if (   qInt. stop == qlen - 1 
+               && sTail (false) >= a2s
+              )
+        c_complete = efalse;
+      qlen--;
     }
-    else if (   qend == qlen - 1 
-             && sTail (false) >= a2s
-            )
-      c_complete = efalse;
-    qlen--;
+    else 
+    {
+      QC_IMPLY (qProt && qInt. stop == qlen, qseq. back () != '*');
+    }
+      
+    QC_ASSERT (! sseq. empty ());
+    if (   bacterialStartCodon
+        && qProt  // sProt => sseq can be found incorrectly
+        && qInt. start == 0 
+        && qseq [0] == 'M'
+        && charInSet (sseq [0], "LIV")  
+       )
+      sseq [0] = 'M';
   }
-  else 
-  {
-    QC_IMPLY (qProt && qend == qlen, qseq. back () != '*');
-  }
-
-  sInternalStop = aProt && sseq. find ('*') != string::npos;
-    
-  moveDashesRight ();    
-
-  QC_ASSERT (! sseq. empty ());
-  if (   bacterialStartCodon
-      && qProt  // sProt => sseq can be found incorrectly
-      && qstart == 0 
-      && qseq [0] == 'M'
-      && charInSet (sseq [0], "LIV")  
-     )
-    sseq [0] = 'M';
+  
 
   length = qseq. size ();
   nident = 0;
@@ -4662,17 +4766,13 @@ void Hsp::finishHsp (bool qStopCodon,
       sgap++;
     else if (charMatch (i))
       nident++;
-  }
-  
+  }  
 
   sframe = 0;
-  if (aProt)
-    if (! sProt)
-    {
-      sframe = Frame ((sstart % 3) + 1);
-      if (sstrand < 0)
-        sframe = - sframe;
-    }
+  if (aProt && ! sProt)
+    sframe = sInt. frame ();
+
+  sInternalStop = aProt && contains (sseq, '*');
 
   pos2q_. clear ();
   pos2s_. clear ();
@@ -4683,42 +4783,45 @@ void Hsp::finishHsp (bool qStopCodon,
   
   pos2q_. reserve (length + 1);
   {
-    size_t j = qstart;
+    size_t j = qInt. start;
     FFOR (size_t, i, length + 1)
     {
-      ASSERT (j >= qstart);
-      ASSERT (j <= qend);
+      ASSERT (j >= qInt. start);
+      ASSERT (j <= qInt. stop);
       pos2q_ << j;
       if (qseq [i] != '-')
         j += a2q;
     }
   }
-  pos2q_. searchSorted = true;
+  pos2q_. ascending = etrue;
 
   pos2s_. reserve (length + 1);
   {
-    size_t j = (sstrand == 1 ? sstart : send);
+    ASSERT (sInt. stop);
+    size_t j = (sInt. strand == -1 ? sInt. stop : sInt. start);
     FFOR (size_t, i, length + 1)
     {
-      ASSERT (j >= sstart);
-      ASSERT (j <= send);
+      ASSERT (j >= sInt. start);
+      ASSERT (j <= sInt. stop);
       pos2s_ << j;
       if (sseq [i] != '-')
       {
-        if (sstrand == 1)
-          j += a2s;
-        else
+        if (sInt. strand == -1)  // sInt.strand*a2s: needs int
           j -= a2s;
+        else
+          j += a2s;
       }
     }
   }
-  pos2s_. searchSorted = true;
+  pos2s_. ascending = (sInt. strand == -1 ? efalse : etrue);  
 }
 
 
 
 void Hsp::moveDashesRight ()
 {
+  ASSERT (! merged);
+  
   for (;;)
   {
     const bool b1 = moveDashesRight_ (qseq, sseq);
@@ -4729,15 +4832,27 @@ void Hsp::moveDashesRight ()
       break;
   }
   ASSERT (qseq. size () == sseq. size ());
+  ASSERT (! qseq. empty ());
   
-  while (   qseq. back () == '-'
-         && sseq. back () == '-'
+  while (   qseq. front () == '-'
+         || sseq. front () == '-'
         )
   {
-    qseq. erase (qseq. size () - 1, 1);
-    sseq. erase (sseq. size () - 1, 1);
+    eraseQseqFront ();
+    eraseSseqFront ();
+    ASSERT (qseq. size () == qseq. size ());
+    ASSERT (! qseq. empty ());
   }
-  ASSERT (qseq. size () == qseq. size ());
+  
+  while (   qseq. back () == '-'
+         || sseq. back () == '-'
+        )
+  {
+    eraseQseqBack ();
+    eraseSseqBack ();
+    ASSERT (qseq. size () == qseq. size ());
+    ASSERT (! qseq. empty ());
+  }
 }
 
 
@@ -4775,6 +4890,73 @@ bool Hsp::moveDashesRight_ (const string &seq1,
 
 
 
+void Hsp::eraseQseqFront ()
+{
+  ASSERT (! qseq. empty ());
+
+  if (qseq. front () != '-')
+    qInt. start += a2q;
+
+  qseq. erase (0, 1);
+}
+
+
+
+void Hsp::eraseSseqFront ()
+{
+  ASSERT (! sseq. empty ());
+
+  if (sseq. front () != '-')
+  {
+    if (sInt. strand == -1)
+    {
+      ASSERT (sInt. stop > a2s);
+      sInt. stop -= a2s;
+    }
+    else
+      sInt. start += a2s;
+  }
+
+  sseq. erase (0, 1);
+}
+
+
+
+void Hsp::eraseQseqBack ()
+{
+  ASSERT (! qseq. empty ());
+
+  if (qseq. back () != '-')
+  {
+    ASSERT (qInt. stop > a2q);
+    qInt. stop -= a2q;
+  }
+
+  qseq. erase (qseq. size () - 1);
+}
+
+
+
+void Hsp::eraseSseqBack ()
+{
+  ASSERT (! sseq. empty ());
+
+  if (sseq. back () != '-')
+  {
+    if (sInt. strand == -1)
+      sInt. start += a2s;
+    else
+    {
+      ASSERT (sInt. stop > a2s);
+      sInt. stop -= a2s;
+    }
+  }
+
+  sseq. erase (sseq. size () - 1);
+}
+
+
+
 void Hsp::qc () const 
 {
   if (! qc_on)
@@ -4783,51 +4965,45 @@ void Hsp::qc () const
   Root::qc ();
 
 
+  QC_IMPLY (merged, blastx ());
+
   QC_IMPLY (qProt || sProt, aProt);
   QC_IMPLY (sProt, qProt);
     
   if (empty ())
   {
-    QC_ASSERT (sseqid. empty ());    
-    QC_ASSERT (sseq. empty ());
-    QC_ASSERT (! sstart);
-    QC_ASSERT (! send);
-    QC_ASSERT (! slen);
     QC_ASSERT (qseqid. empty ());
     QC_ASSERT (qseq. empty ());
-    QC_ASSERT (! qstart);
-    QC_ASSERT (! qend);
-    QC_ASSERT (! qlen);  
-    QC_ASSERT (! nident);
-    QC_ASSERT (! qgap);
-    QC_ASSERT (! sgap);
-    QC_ASSERT (! qx);
-    QC_ASSERT (! sx);
+    QC_ASSERT (qInt. empty ());
+    QC_ASSERT (qlen == no_index);  
+    QC_ASSERT (sseqid. empty ());    
+    QC_ASSERT (sseq. empty ());
+    QC_ASSERT (sInt. empty ());
+    QC_ASSERT (slen == no_index);
+    QC_ASSERT (nident == no_index);
+    QC_ASSERT (qgap == no_index);
+    QC_ASSERT (sgap == no_index);
+    QC_ASSERT (qx == no_index);
+    QC_ASSERT (sx == no_index);
     return;
   }
   
   QC_ASSERT (! qseqid. empty ());	    
   QC_ASSERT (! sseqid. empty ());	    
 
-  QC_ASSERT (qstart < qend);
-  QC_ASSERT (sstart < send);
-  QC_ASSERT (send <= slen);
-  QC_ASSERT (qend <= qlen);
+  qInt. qc ();
+  sInt. qc ();
+  QC_ASSERT (sInt. stop <= slen);
+  QC_ASSERT (qInt. stop <= qlen);
   QC_ASSERT (qseq. size () == sseq. size ());		  
 	QC_ASSERT (! qseq. empty ()); 
-	QC_ASSERT ((bool) sstrand == ! sProt);	
+	QC_ASSERT ((bool) sInt. strand == ! sProt);	
   if (disrs. empty ())
   {
-    QC_ASSERT (divisible ((uint) (qend - qstart), a2q));	  
-    QC_ASSERT (divisible ((uint) (send - sstart), a2s));	  
+    QC_ASSERT (divisible (qInt. len (), a2q));	  
+    QC_ASSERT (divisible (sInt. len (), a2s));	  
   }
   
-#if 0
-  QC_ASSERT (qseq. front () != '-');
-  QC_ASSERT (qseq. back  () != '-');
-  QC_ASSERT (sseq. front () != '-');
-  QC_ASSERT (sseq. back  () != '-');
-#endif
   FFOR (size_t, i, qseq. size ())
     QC_ASSERT (   qseq [i] != '-' 
                || sseq [i] != '-'
@@ -4838,7 +5014,7 @@ void Hsp::qc () const
 
   // finishHsp()
   QC_ASSERT (length);
-  QC_ASSERT (nident);
+  QC_IMPLY (! merged, nident);
   QC_ASSERT (qx <= length);
   QC_ASSERT (sx <= length);
   QC_ASSERT (nident + qgap <= length);
@@ -4846,38 +5022,79 @@ void Hsp::qc () const
   QC_ASSERT (length == qseq. size ());  
   if (disrs. empty ())
   {
+    if (! merged)
+    {
+      QC_ASSERT (qseq. front () != '-');
+      QC_ASSERT (sseq. front () != '-');
+      QC_ASSERT (qseq. back  () != '-');
+      QC_ASSERT (sseq. back  () != '-');
+    }
     QC_ASSERT (nident <= qLen ());
     QC_ASSERT (nident <= sLen ());
     QC_ASSERT (qLen () <= length);	    
     QC_ASSERT (sLen () <= length);	    
-		QC_IMPLY (aProt && ! qProt, (qend - qstart) % 3 == 0); 
-		QC_IMPLY (aProt && ! sProt, (send - sstart) % 3 == 0); 
+		QC_IMPLY (aProt && ! qProt, qAbsCoverage () % 3 == 0); 
+		QC_IMPLY (aProt && ! sProt, sAbsCoverage () % 3 == 0); 
     QC_ASSERT (pos2q_. size () == length + 1);
     QC_ASSERT (pos2s_. size () == length + 1);
-    QC_ASSERT (pos2q_ [0] == qstart);
-    QC_ASSERT (pos2q_ [length] == qend);
-    QC_ASSERT (pos2s_ [0] == sStart ());
-    QC_ASSERT (pos2s_ [length] == sEnd ());
-    QC_ASSERT (pos2q_. searchSorted);
-    QC_ASSERT (pos2s_. searchSorted);
+    QC_ASSERT (pos2q_ [0]      == qInt. start);
+    QC_ASSERT (pos2q_ [length] == qInt. stop);
+    QC_ASSERT (pos2s_ [0]      == sInt. realStart ());
+    QC_ASSERT (pos2s_ [length] == sInt. realStop ());
+    QC_ASSERT (pos2q_. ascending == etrue);
+    QC_ASSERT (pos2s_. ascending != enull);
     FOR (size_t, i, length)
     {
-      QC_ASSERT (pos2q_ [i] <= pos2q_ [i + 1]);
-      QC_IMPLY (sstrand ==  1, pos2s_ [i] <= pos2s_ [i + 1]);
-      QC_IMPLY (sstrand == -1, pos2s_ [i] >= pos2s_ [i + 1]);
+      QC_ASSERT                             (pos2q_ [i] <= pos2q_ [i + 1]);
+      QC_IMPLY (pos2s_. ascending == etrue,  pos2s_ [i] <= pos2s_ [i + 1]);
+      QC_IMPLY (pos2s_. ascending == efalse, pos2s_ [i] >= pos2s_ [i + 1]);
     }
   }
   else
   {
+    QC_ASSERT (merged);
     QC_ASSERT (pos2q_. empty ());
     QC_ASSERT (pos2s_. empty ());
+  //const Disruption* prev = nullptr;
     for (const Disruption& disr : disrs)
-      QC_ASSERT (! disr. smooth ());
+    {
+      disr. qc ();
+      QC_ASSERT (disr. type () != Disruption::eNone);
+      QC_ASSERT (disr. type () != Disruption::eSmooth);
+      QC_ASSERT (disr. prev->qseqid == qseqid);
+      QC_ASSERT (disr. next->qseqid == qseqid);
+      QC_ASSERT (disr. sInt (). strand == sInt. strand);
+      QC_IMPLY (disr. sStopCodon (), qInt. contains (disr. qInt ()));
+      QC_IMPLY (disr. sStopCodon (), sInt. contains (disr. sInt ()));
+      QC_ASSERT (blastx ());      
+    //QC_IMPLY (prev, ! (disr < *prev));
+    //prev = & disr;
+    }
   }
 	QC_ASSERT ((bool) sframe  == (aProt && ! sProt));
-	QC_IMPLY (aProt && ! sProt, (sstrand > 0) == (sframe > 0));
+	QC_IMPLY (aProt && ! sProt, (sInt. strand == -1) == (sframe < 0));
 	QC_IMPLY (c_complete != enull, aProt);
   QC_IMPLY (aProt && ! sProt, isFrame (sframe));
+  
+  QC_IMPLY (sInternalStop, aProt);
+  if (merged)
+  {
+    const Disruption* found = nullptr;
+    for (const Disruption& disr : disrs)
+      if (disr. sStopCodon ())
+      {
+        found = & disr;
+        break;
+      }
+    if ((bool) found != sInternalStop)
+    {
+      if (found)
+        PRINT (*found);
+      PRINT (sInternalStop);
+      PRINT (*this);
+      ERROR;
+    }
+  }
 }
 
 
@@ -4885,20 +5102,20 @@ void Hsp::qc () const
 void Hsp::saveText (ostream &os) const 
 {
   os        << "Hsp:"
-     << ' ' << qseqid << '(' << qlen << ')'
-     << ' ' << sseqid << '(' << slen << ')'
-     << ' ' << qstart + 1 << '(' << (sstrand == -1 ? send : (sstart + 1)) << ')'
-     << '-' << qend       << '(' << (sstrand == -1 ? (sstart + 1) : send) << ')'
-     << " qLen=" << qLen ()
-     << " sLen=" << sLen ()
-     << " length=" << length
+     << ' ' << "merged=" << (int) merged
+     << ' ' << qseqid << '(' << qlen << ") " << qInt
+     << ' ' << sseqid << '(' << slen << ") " << sInt;
+  if (disrs. empty ())
+    os << " qLen=" << qLen ()
+       << " sLen=" << sLen ();
+  os << " length=" << length
      << " nident=" << nident
      << " qgap=" << qgap
      << " sgap=" << sgap
      << " qx=" << qx
      << " sx=" << sx     
-     << " sstrand=" << (int) sstrand
      << " sframe=" << (int) sframe
+     << " sInternalStop=" << (int) sInternalStop
      << " #disrs=" << disrs. size ();
   for (const Disruption& disr : disrs)
     os << ' ' << disr;
@@ -4913,43 +5130,25 @@ bool Hsp::less (const Hsp* a,
   ASSERT (b);
   
   LESS_PART (*a, *b, sseqid);
-  LESS_PART (*a, *b, sstrand);
+  LESS_PART (*a, *b, sInt. strand);
   LESS_PART (*a, *b, qseqid);
-  LESS_PART (*a, *b, sstart);
-  LESS_PART (*a, *b, send);
-  return false;
+  return a->sInt < b->sInt;
 }
 
 
 
-bool Hsp::qBetterEq (const Hsp &other) const
-{
-  ASSERT (aProt   == other. aProt);
-  ASSERT (sseqid  == other. sseqid);
-  ASSERT (sstrand == other. sstrand);
-
-  if (! other. sInsideEq (*this, 0))
-    return false;
-  LESS_PART (other, *this, relIdentity ());
-  LESS_PART (other, *this, nident);
-  // Tie
-  LESS_PART (*this, other, qseqid);
-  return true;
-}    
-
-
-
-string Hsp::qMap (size_t len) const
+size_t Hsp::qLen () const
 { 
-  ASSERT (qlen <= len);
-  
-  string s = string (qstart, '-'); 
-  FFOR (size_t, i, length)
-    if (qseq [i] != '-')
-      s += sseq [i];
-  s += string (len - qend, '-'); 
-  
-  return s;
+  ASSERT (disrs. empty ());
+  return qAbsCoverage () / a2q; 
+}
+
+
+
+size_t Hsp::sLen () const
+{ 
+  ASSERT (disrs. empty ());
+  return sAbsCoverage () / a2s; 
 }
 
 
@@ -4986,113 +5185,257 @@ size_t Hsp::pos2real_s (size_t pos,
 
 
 
-
-// Exon
-
-void Exon::finishExon ()
-{
-  ASSERT (graph);
-  ASSERT (score == 0);
-  ASSERT (! bestIntron);
-  
-  
-  if (getEnd () == hsp. length)
-  {
-    // new Exon(), len
-    // PAR
-    constexpr size_t window = 10;  
-    constexpr int    diff   = 6;
-    //
-    size_t gap = 0;  
-      // (bool)gap <=> i is in a gap
-    size_t gapNident = 0;
-    FFOR_START (size_t, i, start, getEnd ())
-    {
-      ASSERT (gapNident <= gap);
-      if (gap == 0)
-      {
-        if (   i
-            &&   hsp. charMatch (i - 1)
-            && ! hsp. charMatch (i)     
-            && densityDifference (i, window) >= diff
-           )
-          gap++;
-      }
-      else
-      {
-        if (   i
-            && ! hsp. charMatch (i - 1)
-            &&   hsp. charMatch (i)
-            && - densityDifference (i, window) >= diff
-           )
-        {
-          if (   gap >= window 
-              && (double) gapNident / (double) gap <= 0.15  // PAR
-             )  
-          {
-            ASSERT (gap);
-            ASSERT (start + gap < i);
-            const size_t gapStart = i - gap;
-            auto gapExon = new Exon (* var_cast (graph), hsp, gapStart, gap,           sm);  
-            auto exon    = new Exon (* var_cast (graph), hsp, i,        getEnd () - i, sm);
-            gapExon->qc ();
-            exon->qc ();
-            ASSERT (gapStart > start);
-            len = gapStart - start;
-            ASSERT (getEnd ()          == gapExon->start);
-            ASSERT (gapExon->getEnd () == exon   ->start);
-            ASSERT (         qEnd () == gapExon->qStart ());
-            ASSERT (gapExon->qEnd () == exon   ->qStart ());
-            ASSERT (arcable (*gapExon));
-            ASSERT (gapExon->arcable (*exon));
-            ASSERT (gapExon->getEnd () < hsp. length);
-            ASSERT (hsp. qseq [exon->start]         != '-');
-            ASSERT (hsp. qseq [exon->getEnd () - 1] != '-');
-            break;
-          }
-          gap = 0;
-          gapNident = 0;
-        }
-        else
-        {
-          gap++;
-          if (hsp. charMatch (i))
-            gapNident++;
-        }
-      }
-    }
-  }
-  
-      
-  FFOR_START (size_t, i, start, getEnd ())
-    score += SubstMat::char2score (sm, hsp. qseq [i], hsp. sseq [i]);
-//QC_ASSERT (score > 0);
+size_t Hsp::pos2q (size_t pos,
+                   bool forward) const
+{ 
+  ASSERT (disrs. empty ());
+  return pos2q_ [pos2real_q (pos, forward)]; 
 }
 
 
 
-int Exon::densityDifference (size_t pos,
-                             size_t window) const
+size_t Hsp::pos2s (size_t pos,
+                   bool forward) const
+{ 
+  ASSERT (disrs. empty ());
+  return pos2s_ [pos2real_s (pos, forward)]; 
+}
+
+
+
+size_t Hsp::q2pos (size_t qPos,
+                   bool forward) const
+{ 
+  ASSERT (disrs. empty ());
+  return pos2real_q (pos2q_. binSearch (qPos), forward); 
+}
+
+
+
+size_t Hsp::s2pos (size_t sPos,
+                   bool forward) const
+{ 
+  ASSERT (disrs. empty ());
+  return pos2real_s (pos2s_. binSearch (sPos), forward); 
+}
+
+
+
+bool Hsp::qBetterEq (const Hsp &other) const
 {
-  ASSERT (pos >= start);
-  ASSERT (pos < getEnd ());
+  ASSERT (aProt        == other. aProt);
+  ASSERT (sseqid       == other. sseqid);
+  ASSERT (sInt. strand == other. sInt. strand);
+
+  if (! other. sInsideEq (*this, 0))
+    return false;
+  LESS_PART (other, *this, relIdentity ());
+  LESS_PART (other, *this, nident);
+  // Tie
+  LESS_PART (*this, other, qseqid);
+  return true;
+}    
+
+
+
+string Hsp::qMap (size_t len) const
+{ 
+  ASSERT (qlen <= len);
   
-  const size_t startLocal = max (start,     pos > window ? (pos - window) : 0);
-  const size_t endLocal   = min (getEnd (), pos + window);
-  ASSERT (startLocal <= pos);
-  ASSERT (pos <= endLocal);
+  string s = string (qInt. start, '-'); 
+  FFOR (size_t, i, length)
+    if (qseq [i] != '-')
+      s += sseq [i];
+  s += string (len - qInt. stop, '-'); 
+  
+  return s;
+}
 
-  int nidentBefore = 0;
-  FOR_START (size_t, i, startLocal, pos)
-    if (hsp. qseq [i] == hsp. sseq [i])
-      nidentBefore++;
 
-  int nidentAfter = 0;
-  FOR_START (size_t, i, pos, endLocal)
-    if (hsp. qseq [i] == hsp. sseq [i])
-      nidentAfter++;
+
+namespace
+{
+  
+struct Intron;
+  
+
+  
+struct Exon final : DiGraph::Node
+{
+  friend Hsp;
+  friend Intron;
+  
+  // Input
+  bool isInsertion;
+  const Hsp& hsp;
+    // qseqid: reference protein
+    // sseqid: contig 
+    // disrs.empty()
+  // In hsp.{qseq,sseq}
+  size_t start {0};
+  size_t len {0};
+  const SubstMat* sm {nullptr};  
+    // nullptr <=> match = 1, mismatch = 0
+	
+	// Output
+	AlignScore score {0};
+  Vector<Disruption> disrs;
+    // type() != eNone,eSmooth
+private:
+	bool bestIntronSet {false};
+public:
+	const Intron* bestIntron {nullptr};
+	AlignScore totalScore {- score_inf};
+
+
+  Exon (DiGraph &graph_arg,    
+        bool isInsertion_arg,    
+        const Hsp &hsp_arg,
+        size_t start_arg,
+        size_t len_arg,
+      	const SubstMat* sm_arg);
+  void saveText (ostream &os) const final;
+  void qc () const final;
       
-  return nidentBefore - nidentAfter;
+  
+  size_t getStop () const
+    { return start + len; }  
+
+  // Logical start/end  
+  size_t qStart () const
+    { return hsp. pos2q (start, true); }
+  size_t qStop () const
+    { return hsp. pos2q (getStop (), true); }
+  size_t sStart () const
+    { return hsp. pos2s (start, true); }
+  size_t sStop () const
+    { return hsp. pos2s (getStop (), true); }
+  Interval qInt () const
+    { return Interval (qStart (), qStop (), 0); }
+  Interval sInt () const
+    { if (hsp. sInt. strand == -1)
+        return Interval (sStop (), sStart (), -1); 
+      return Interval (sStart (), sStop (), 1); 
+    }
+
+  size_t qCenter () const  
+    { return (qStart () + qStop ()) / 2; }
+  size_t sCenter () const  
+    { return (sStart () + sStop ()) / 2; }
+
+  bool arcable (const Exon &next,
+                bool bacteria) const;
+    // Return: true => same sInt.strand
+private:
+  void setBestIntron (AlignScore intronScore);
+    // Update: bestIntronSet, totalScore, bestIntron
+  Hsp mergeTail (const Hsp* &firstOrigHsp) const;
+    // Output: firstOrigHsp: !nullptr, !merged
+    // Invokes: delete bestIntron->next
+};
+
+
+
+struct Intron final : DiGraph::Arc
+// Intron in Hsp::sseqid
+// DAG
+{
+  friend Exon;
+  AlignScore score {score_inf};
+    // Score lost by merging *prev and *next
+    // Minimized
+  size_t prev_start {no_index};
+    // In prev->hsp.{qseq,sseq}
+  size_t next_stop {no_index};
+    // In next->hsp.{qseq,sseq}
+  Disruption disr;
+    // !empty()
+  
+  
+  Intron (Exon* prev,
+          Exon* next);
+  void qc () const final;
+  void saveText (ostream &os) const final;
+    
+
+private:    
+  AlignScore getTotalScore (AlignScore intronScore);
+    // Invokes: next->setBestIntron()
+};
+
+
+
+
+// Exon
+
+Exon::Exon (DiGraph &graph_arg,    
+            bool isInsertion_arg,    
+            const Hsp &hsp_arg,
+            size_t start_arg,
+            size_t len_arg,
+          	const SubstMat* sm_arg)
+: DiGraph::Node (graph_arg)
+, isInsertion (isInsertion_arg)
+, hsp (hsp_arg)
+, start (start_arg)
+, len (len_arg)
+, sm (sm_arg)
+{
+  ASSERT (graph);
+  ASSERT (len);
+  ASSERT (! bestIntron);
+  ASSERT (! hsp. merged);
+
+    
+  ASSERT (score == 0);
+  ASSERT (disrs. empty ());
+  FFOR_START (size_t, i, start, getStop ())
+  {
+    score += SubstMat::char2score (sm, hsp. qseq [i], hsp. sseq [i]);
+
+    if (hsp. sseq [i] == '*')
+    {
+      size_t i_prev = hsp. pos2real_q (i, false);
+      size_t i_next = hsp. pos2real_q (i, true);
+    #ifndef NDEBUG
+      bool replacement = true;
+    #endif
+      if (i_prev == i_next)  // Replacement
+      {
+        ASSERT (i_prev == i);
+        ASSERT (hsp. qseq [i] != '-');
+        i_next++;
+      }
+      else  // Deletion
+      {
+        QC_ASSERT (i_prev < getStop ());
+        ASSERT (i_prev < i);
+        ASSERT (i < i_next);
+        ASSERT (hsp. qseq [i_prev] != '-');
+        ASSERT (hsp. qseq [i_next] != '-');
+        i_prev++;
+        ASSERT (hsp. qseq [i_prev] == '-');
+      #ifndef NDEBUG
+        replacement = false;  
+      #endif
+      }
+
+      Disruption disr (hsp, hsp, i_prev, i_next);      
+        /* Interval ( prev->pos2q/s (prev_start, true)
+                    , next->pos2q/s (next_stop,  true)
+        */
+      disr. qc (); 
+      IMPLY (replacement, disr. qInt (). len () == 1);
+      IMPLY (replacement, disr. sInt (). len () == 3);
+      IMPLY (  replacement, disr. type () == Disruption::eDeletion);
+      IMPLY (! replacement, disr. type () == Disruption::eInsertion);      
+      ASSERT (qInt (). contains (disr. qInt ()));
+      ASSERT (sInt (). contains (disr. sInt ()));
+      ASSERT (disr. sStopCodon ());
+      
+      disrs << std::move (disr);
+    }
+  }
 }
 
 
@@ -5106,15 +5449,32 @@ void Exon::qc () const
   QC_IMPLY (bestIntron, arcs [true]. find (var_cast (bestIntron)) != no_index);
 
   hsp. qc ();
+  QC_ASSERT (! hsp. merged);
   QC_ASSERT (hsp. blastx ());
   QC_ASSERT (hsp. disrs. empty ());
-  QC_ASSERT (getEnd () <= hsp. length);
-  QC_IMPLY (sStart () != sEnd (), (sStart () < sEnd ()) == (hsp. sstrand == 1));
-  
+  QC_ASSERT (getStop () <= hsp. length);
+  QC_IMPLY (sStart () != sStop (), (sStart () >= sStop ()) == (hsp. sInt. strand == -1));    
   QC_ASSERT (len);
-  
+  qInt (). qc ();
+  sInt (). qc ();
+  QC_ASSERT (hsp. qInt. contains (qInt ()));
+  QC_ASSERT (hsp. sInt. contains (sInt ()));
   if (sm)
     sm->qc ();
+    
+  for (const Disruption& disr : disrs)
+  {
+    disr. qc ();
+    QC_ASSERT (disr. type () != Disruption::eNone);
+    QC_ASSERT (disr. type () != Disruption::eSmooth);
+    QC_ASSERT (disr. type () != Disruption::eFrameshift);
+    QC_ASSERT (disr. sameHsp ());
+    QC_ASSERT (disr. prev == & hsp);
+    QC_ASSERT (disr. sStopCodon ());
+    QC_ASSERT (qInt (). contains (disr. qInt ()));
+    QC_ASSERT (sInt (). contains (disr. sInt ()));
+  }    
+  QC_ASSERT ((! disrs. empty ()) == contains (hsp. sseq. substr (start, len), '*'));
     
 //QC_ASSERT (score >= 0);
 //QC_ASSERT (totalScore >= 0);
@@ -5125,48 +5485,56 @@ void Exon::qc () const
 void Exon::saveText (ostream &os) const 
 {
   os << "Exon:"
+     << " insertion:" << (int) isInsertion
      << " start=" << start
      << " len=" << len
-     << ' ' << qStart () + 1 << '(' << sStart () + size_t (hsp. sstrand ==  1) << ")-" 
-            << qEnd ()       << '(' << sEnd ()   + size_t (hsp. sstrand == -1) << ')'
+     << ' ' << qInt () 
+     << ' ' << sInt ()
      << " score:" << score 
+     << " #disrs:" << disrs. size ()
      << " totalScore:" << totalScore
      << "  ";
   hsp. saveText (os);
+  
   for (const DiGraph::Arc* arc : arcs [true])
   {
     ASSERT (arc);
     ASSERT (arc->node [false] == this);
     const Intron* intron = static_cast <const Intron*> (arc);
+    if (intron != bestIntron)
+      continue;
     Offset ofs;
     Offset::newLn (os);
-    if (intron == bestIntron)
-      os << "BEST! ";
+    os << "BEST! ";
     intron->saveText (os);
   }
 }
 
 
 
-bool Exon::arcable (const Exon &next) const
+bool Exon::arcable (const Exon &next,
+                    bool bacteria) const   
 {
   ASSERT (hsp. qseqid == next. hsp. qseqid);
   ASSERT (hsp. sseqid == next. hsp. sseqid);
   
   if (this == & next)
+    return false;    
+  if (& hsp == & next. hsp)
+    return getStop () == next. start;
+  if (next. isInsertion)
     return false;
     
   // PAR
-  constexpr size_t intron_max = 30000;  // nt 
+  const size_t intron_max = bacteria ? 5000/*transposon length*/ : 30000;  // nt 
   
-  if (hsp. sstrand != next. hsp. sstrand)
+  if (hsp. sInt. strand != next. hsp. sInt. strand)
     return false;
-//if (same frame and overlap) return false;  // ??
 
   // => DAG
   if (qCenter () >= next. qCenter ())
     return false;  
-  if (hsp. sstrand == 1)
+  if (hsp. sInt. strand == 1)
   {
     if (sCenter () >= next. sCenter ())
       return false;  
@@ -5175,20 +5543,22 @@ bool Exon::arcable (const Exon &next) const
     if (next. sCenter () >= sCenter ())
       return false;  
 
-#if 0
-  // For frame shifts only
-  if (qEnd () + 20 < next. qStart ())  // PAR  
-    return false;
-#endif
-  if (qEnd () >= next. qStart () + 50)  // PAR
-    return false;
+  if (bacteria)
+  {
+  #if 0
+    if (qStop () + 20 < next. qStart ())  // PAR  // Not only frame shifts
+      return false;
+  #endif
+    if (qStop () >= next. qStart () + 50)  // PAR
+      return false;
+  }
 
-  if (   hsp. sstrand == 1 
-      && sEnd () + intron_max < next. sStart ()
+  if (   hsp. sInt. strand == 1 
+      && sStop () + intron_max < next. sStart ()
      )
     return false;
-  if (   hsp. sstrand == -1 
-      && next. sStart () + intron_max < sEnd ()
+  if (   hsp. sInt. strand == -1 
+      && next. sStart () + intron_max < sStop ()
      )
     return false;
      
@@ -5197,7 +5567,7 @@ bool Exon::arcable (const Exon &next) const
 
     
 
-void Exon::setBestIntron ()
+void Exon::setBestIntron (AlignScore intronScore)
 {
   if (bestIntronSet)
     return;    
@@ -5210,157 +5580,103 @@ void Exon::setBestIntron ()
     ASSERT (arc);
     ASSERT (arc->node [false] == this);
     const Intron* intron = static_cast <const Intron*> (arc);
-    if (maximize (totalScore, score + var_cast (intron) -> getTotalScore ()))
+    if (maximize (totalScore, score + var_cast (intron) -> getTotalScore (intronScore)))
       bestIntron = intron;
   }
-//ASSERT (bestIntron);
 }
 
 
 
-Vector<Hsp> Exon::mergeHsps (const VectorPtr<Hsp> &hsps,
-                             VectorPtr<Hsp> &firstHsps,
-                             const SubstMat* sm)
+Hsp Exon::mergeTail (const Hsp* &firstOrigHsp) const
 {
-  DiGraph graph;  // of Exon, Intron
-  for (const Hsp* hsp : hsps)
-  {
-    ASSERT (hsp);
-    new Exon (graph, *hsp, sm); 
-  }	
-  for (Node* node1 : graph. nodes)
-  {
-    Exon* next = static_cast <Exon*> (node1);
-    ASSERT (next);
-    for (Node* node2 : graph. nodes)
-	  {
-      Exon* prev = static_cast <Exon*> (node2);
-      ASSERT (prev);
-      if (prev->arcable (*next))
-        new Intron (var_cast (prev), var_cast (next));
-    }
-	}
-	graph. qc ();
-	
-#if 0
-  for (const Node* node : graph. nodes)
-  {
-    const Exon* e = static_cast <const Exon*> (node);
-    if (   e->hsp. qseqid == "WP_002913005.1"
-      //&& e->hsp. sseqid == "JAOQKQ010000001.1"
-       )
-    {
-      e->saveText (cout);
-      cout << endl << endl;
-    }
-  }
-#endif
-
-	  	
-	Vector<Hsp> merged;
-	for (;;)
-	{
-    for (Node* node : graph. nodes)
-    {
-      Exon* exon = static_cast <Exon*> (node);
-      ASSERT (exon);
-      exon->bestIntronSet = false;
-    }
-
-  	const Exon* bestExon = nullptr;
-  	AlignScore totalScore_max = - score_inf;
-  	if (verbose ())
-	    cout << endl << "Graph:" << endl;
-    for (Node* node : graph. nodes)
-    {
-      Exon* exon = static_cast <Exon*> (node);
-      ASSERT (exon);
-      exon->setBestIntron ();
-      if (verbose ())
-      {
-        exon->saveText (cout);
-        cout << endl;
-      }
-    #if 0 
-      if (exon->totalScore <= 0)  // PAR 
-        continue;
-    #endif
-      if (maximize (totalScore_max, exon->totalScore))
-        bestExon = exon;
-    }
-    if (! bestExon)
-      break;
-    ASSERT (totalScore_max > - score_inf);
-
-    const Hsp* firstHsp = nullptr;
-    merged << std::move (var_cast (bestExon) -> mergeTail (firstHsp));
-    ASSERT (firstHsp);
-    firstHsps << firstHsp;    
-  #if 0 
-    if (firstHsp->qseqid == "WP_002913005.1")
-    {
-      cout << "firstHsp: ";
-      firstHsp->saveText (cout);
-      cout << endl;
-    }
-  #endif
-        
-    delete bestExon; 
-  //break;  // If only the best match is needed ??
-  }
-  graph. qc ();
-//ASSERT (merged. size () <= hsps. size ());
-  
-  
-  return merged;
-}
-
-
-
-Hsp Exon::mergeTail (const Hsp* &firstHsp) 
-{
+  ASSERT (! hsp. merged);
   ASSERT (hsp. disrs. empty ());
   
   Hsp hsp_new;
   if (bestIntron)
   {
-    Exon* next = static_cast <Exon*> (bestIntron->node [true]);
+    ASSERT (bestIntron->node [false] == this);
+    const Exon* next = static_cast <Exon*> (bestIntron->node [true]);
     ASSERT (next);    
-    hsp_new = std::move (next->mergeTail (firstHsp));
-    hsp_new. qstart = qStart ();
-    if (hsp_new. sstrand == 1)
-      hsp_new. sstart = sStart ();
-    else
-      hsp_new. send = sStart ();
-    hsp_new. qseq = hsp. qseq. substr (start, bestIntron->prev_end - start) + hsp_new. qseq. substr (bestIntron->next_start - next->start);
-    hsp_new. sseq = hsp. sseq. substr (start, bestIntron->prev_end - start) + hsp_new. sseq. substr (bestIntron->next_start - next->start);
+    
+    hsp_new = next->mergeTail (firstOrigHsp);  
+  //const Hsp hsp_new_orig = hsp_new;  
+    hsp_new. qInt. start        = qStart ();
+    hsp_new. sInt. realStart () = sStart ();
+    
+    ASSERT (bestIntron->prev_start >= start);
+    const size_t prev_len = bestIntron->prev_start - start; 
+    ASSERT (bestIntron->next_stop >= next->start);
+    const size_t next_start = bestIntron->next_stop - next->start;
+    hsp_new. qseq = hsp. qseq. substr (start, prev_len) + hsp_new. qseq. substr (next_start);
+    hsp_new. sseq = hsp. sseq. substr (start, prev_len) + hsp_new. sseq. substr (next_start);
     ASSERT (hsp_new. qseq. size () == hsp_new. sseq. size ());
-    ASSERT (hsp_new. qseq. size () <= hsp_new. length + hsp. length);
-    if (! bestIntron->disr. smooth ())
+    ASSERT (hsp_new. qseq. size () <= hsp_new. length + hsp. length);    
+
+    const Vector<Disruption> disrs_new (std::move (hsp_new. disrs));
+    ASSERT (hsp_new. disrs. empty ());
+    for (Disruption disr : disrs_new)
+    {
+      if (   disr. sameHsp ()
+          && disr. prev == & next->hsp  // disr.prev = disr.next
+         )
+      {
+        maximize (disr. prev_start, bestIntron->next_stop);
+        minimize (disr. prev_start, disr. next_stop);
+        disr. qc ();
+      }
+      if (disr. type () == Disruption::eSmooth)
+        continue;
+      hsp_new. disrs << std::move (disr);
+    }
+  /*ASSERT (hsp_new. containsHsp (hsp_old));   
+      Counter-example: 
+        Query  94     PPPPSTTTPPPPPPPPPPPPST  115              hsp_old
+                      PP  + T   PPP  PPP  +T
+        Sbjct  98761  PPLQAVT*AIPPPIRPPPSTTT  98826
+
+        Query  110    PPPPSTT----    117   PPPPPPPSTT  126     tailHsp (split RHS)
+                      PP  + T              PP  PPPSTT
+        Sbjct  98761  PPLQAVT*AIP    98794 PPIRPPPSTT  98823
+    */
+    for (Disruption disr : disrs)
+    {
+      ASSERT (disr. sameHsp ());
+      ASSERT (disr. prev == & hsp);  // disr.prev = disr.next
+      minimize (disr. next_stop, bestIntron->prev_start);
+      maximize (disr. next_stop, disr. prev_start);
+      disr. qc ();
+      if (disr. type () == Disruption::eSmooth)
+        continue;
+      hsp_new. disrs << disr;
+    }
+    if (bestIntron->disr. type () != Disruption::eSmooth)
       hsp_new. disrs << bestIntron->disr;
+      
     delete next;  
   }
   else
   {
-    firstHsp = & hsp;
     hsp_new = hsp;
-    hsp_new. qstart = qStart ();
-    hsp_new. qend   = qEnd ();
-    hsp_new. sstart = sStart ();
-    hsp_new. send   = sEnd ();
-    if (hsp_new. sstrand == -1)
-      swap ( hsp_new. sstart
-           , hsp_new. send
+    hsp_new. qInt. start = qStart ();
+    hsp_new. qInt. stop  = qStop ();
+    hsp_new. sInt. start = sStart ();
+    hsp_new. sInt. stop  = sStop ();
+    if (hsp_new. sInt. strand == -1)
+      swap ( hsp_new. sInt. start
+           , hsp_new. sInt. stop
            );
     hsp_new. qseq = hsp_new. qseq. substr (start, len);
     hsp_new. sseq = hsp_new. sseq. substr (start, len);
-    ASSERT (hsp_new. disrs. empty ());
-  }    
+    hsp_new. disrs = disrs;
+    hsp_new. merged = true;
+  }      
+  ASSERT (hsp_new. merged);
   
   hsp_new. finishHsp (false, false);
-  hsp_new. qc ();
+  hsp_new. qc ();  
   
-  ASSERT (firstHsp);
+  firstOrigHsp = & hsp;
   
   return hsp_new;
 }
@@ -5378,19 +5694,19 @@ Intron::Intron (Exon* prev,
   ASSERT (next);
   
 
-  // score, prev_end, next_start
+  // score, prev_start, next_stop
   const size_t qStart = next->qStart ();
-  const size_t qEnd   = prev->qEnd ();
-  if (qEnd <= qStart)
+  const size_t qStop  = prev->qStop ();
+  if (qStop <= qStart)
   {
     score = 0;
-    prev_end   = prev->getEnd ();
-    next_start = next->start;
+    prev_start = prev->getStop ();
+    next_stop  = next->start;
   }
   else
   {
-    // [qStart, qEnd) = overlap of prev->qseq and next->qseq  
-    const size_t qLen = qEnd - qStart;  
+    // [qStart, qStop) = overlap of prev->qseq and next->qseq  
+    const size_t qLen = qStop - qStart;  
     ASSERT (qLen);
           
     Vector<AlignScore> prevScores;  prevScores. reserve (qLen + 1);
@@ -5398,10 +5714,10 @@ Intron::Intron (Exon* prev,
       FFOR_START (size_t, i, qStart, prev->qStart ())
         prevScores << 0;
       size_t qPos = prev->qStart ();
-      FFOR_START (size_t, i, prev->start, prev->getEnd ())
+      FFOR_START (size_t, i, prev->start, prev->getStop ())
         if (prev->hsp. qseq [i] != '-')
         {
-          if (between (qPos, qStart, qEnd))
+          if (between (qPos, qStart, qStop))
             prevScores << SubstMat::char2score ( prev->sm
                                                , prev->hsp. qseq [i]
                                                , prev->hsp. sseq [i]
@@ -5416,17 +5732,17 @@ Intron::Intron (Exon* prev,
     nextScores << 0;
     {
       size_t qPos = next->qStart ();
-      FFOR_START (size_t, i, next->start, next->getEnd ())
+      FFOR_START (size_t, i, next->start, next->getStop ())
         if (next->hsp. qseq [i] != '-')
         {
-          if (between (qPos, qStart, qEnd))
+          if (between (qPos, qStart, qStop))
             nextScores << SubstMat::char2score ( next->sm
                                                , next->hsp. qseq [i]
                                                , next->hsp. sseq [i]
                                                );
           qPos++;
         }
-      FFOR_START (size_t, i, next->qEnd (), qEnd)
+      FFOR_START (size_t, i, next->qStop (), qStop)
         nextScores << 0;
     }
     ASSERT (nextScores. size () == qLen + 1);
@@ -5447,7 +5763,7 @@ Intron::Intron (Exon* prev,
     ASSERT (score != score_inf);
     
     const size_t qSplit = qStart + bestSplit;  
-    ASSERT (betweenEqual (qSplit, qStart, qEnd));
+    ASSERT (betweenEqual (qSplit, qStart, qStop));
     
     if (   qSplit <  prev->qCenter ()
         || qSplit >= next->qCenter ()
@@ -5458,48 +5774,45 @@ Intron::Intron (Exon* prev,
     }
 
     ASSERT (qSplit);
-    prev_end = prev->hsp. q2pos (qSplit - 1, false) + 1;  // To remove trailing '-'
-    ASSERT (prev_end);
-    ASSERT (prev->hsp. qseq [prev_end - 1] != '-');
-    ASSERT (betweenEqual (prev_end, prev->start, prev->getEnd ()));
+    prev_start = prev->hsp. q2pos (qSplit - 1, false) + 1;  // To remove trailing '-'
+    ASSERT (prev_start);
+    ASSERT (prev->hsp. qseq [prev_start - 1] != '-');
+    ASSERT (betweenEqual (prev_start, prev->start, prev->getStop ()));
     
-    next_start = next->hsp. q2pos (qSplit, true);
-    ASSERT (next->hsp. qseq [next_start] != '-');
-    ASSERT (betweenEqual (next_start, next->start, next->getEnd ()));
-
-  #if 0
-    PRINT (qStart);
-    PRINT (qEnd);
-    PRINT (qLen);
-    PRINT (qSplit);
-    PRINT (prev_end);
-    PRINT (next_start);
-    PRINT (& prev->hsp. qseq [prev_end]);
-    PRINT (& prev->hsp. sseq [prev_end]);
-    cout << endl;
-  /*    
-    FOR (size_t, i, prev->hsp. pos2q. size ())
-      cout << i << ' ' << prev->hsp. pos2q [i] << endl;
-  */
-  #endif
+    next_stop = next->hsp. q2pos (qSplit, true);
+    ASSERT (next->hsp. qseq [next_stop] != '-');
+    ASSERT (betweenEqual (next_stop, next->start, next->getStop ()));
   }
 
 
-  // Dummy Exon's
-  if (   prev_end   == prev->start
-      || next_start == next->getEnd ()
+  // Empty Exon's
+  if (   prev_start <= prev->start
+      || next_stop  >= next->getStop ()
      )
   {
     score = score_inf;
     return;
   }
   
-  // disr
-  disr. sstrand     = prev->hsp. sstrand;  
-  disr. prev_qend   = prev->hsp. pos2q (prev_end, true);
-  disr. prev_send   = prev->hsp. pos2s (prev_end, true);
-  disr. next_qstart = next->hsp. pos2q (next_start, true);
-  disr. next_sstart = next->hsp. pos2s (next_start, true);
+
+  // prev_start, next_stop, disr
+  // Eliminating overlapping Exon's 
+  for (;;)
+  {
+    ASSERT (next_stop <= next->getStop ());
+    if (next_stop == next->getStop ())
+    {
+      disr = Disruption ();
+      score = score_inf;
+      return;
+    }
+    disr = Disruption (prev->hsp, next->hsp, prev_start, next_stop);
+    ASSERT (disr. qInt (). valid ());
+    if (disr. sInt (). valid ())
+      break;
+    next_stop++;
+  }    
+  disr. qc ();   
 }
 
 
@@ -5522,30 +5835,34 @@ void Intron::qc () const
   QC_ASSERT (prev->hsp. sseqid  == next->hsp. sseqid);
   QC_ASSERT (prev->hsp. qlen    == next->hsp. qlen);
   QC_ASSERT (prev->hsp. slen    == next->hsp. slen);
-  QC_ASSERT (prev->hsp. sstrand);
-  QC_ASSERT (prev->hsp. sstrand == next->hsp. sstrand);
-  QC_ASSERT (prev->qStart () < next->qEnd ());  // <= arcable()  
-  QC_ASSERT (prev->arcable (*next));
+  QC_ASSERT (prev->hsp. sInt. strand);
+  QC_ASSERT (prev->hsp. sInt. strand == next->hsp. sInt. strand);
+  QC_ASSERT (prev->qStart () < next->qStop ());  // <= arcable()  
+//QC_ASSERT (prev->arcable (*next));
   QC_ASSERT (prev->sm == next->sm);
 
   if (score == score_inf)
     return;
 
-  QC_ASSERT (betweenEqual (prev_end,   prev->start + 1, prev->getEnd ()));
-  QC_ASSERT (betweenEqual (next_start, next->start,     next->getEnd () - 1));
-  ASSERT (prev_end);
-//QC_ASSERT (prev->hsp. qseq [prev_end - 1] != '-');
-//QC_ASSERT (next->hsp. qseq [next_start]   != '-');
+  QC_ASSERT (betweenEqual (prev_start, prev->start + 1, prev->getStop ()));
+  QC_ASSERT (betweenEqual (next_stop,  next->start,     next->getStop () - 1));
+  ASSERT (prev_start);
+//QC_ASSERT (prev->hsp. qseq [prev_start - 1] != '-');
+//QC_ASSERT (next->hsp. qseq [next_stop]      != '-');
 
   disr. qc ();
-  QC_ASSERT (! disr. empty ());
+  QC_ASSERT (disr. type () != Disruption::eNone);
+  QC_ASSERT (disr. sInt (). strand == next->hsp. sInt. strand);
+  QC_ASSERT (! disr. sStopCodon ());
+#if 0
   QC_IMPLY (score != score_inf, disr. prev_qend <= disr. next_qstart);
-  QC_ASSERT (                         betweenEqual (disr. prev_qend,   prev->qStart (), prev->qEnd ()));
-  QC_IMPLY (prev->hsp. sstrand ==  1, betweenEqual (disr. prev_send,   prev->sStart (), prev->sEnd ()));
-  QC_IMPLY (prev->hsp. sstrand == -1, betweenEqual (disr. prev_send,   prev->sEnd (),   prev->sStart ()));
-  QC_ASSERT (                         betweenEqual (disr. next_qstart, next->qStart (), next->qEnd ()));
-  QC_IMPLY (prev->hsp. sstrand ==  1, betweenEqual (disr. next_sstart, next->sStart (), next->sEnd ()));
-  QC_IMPLY (prev->hsp. sstrand == -1, betweenEqual (disr. next_sstart, next->sEnd (),   next->sStart ()));
+  QC_ASSERT (                         betweenEqual (disr. prev_qend,   prev->qStart (), prev->qStop ()));
+  QC_IMPLY (prev->hsp. sInt. strand ==  1, betweenEqual (disr. prev_send,   prev->sStart (), prev->sStop ()));
+  QC_IMPLY (prev->hsp. sInt. strand == -1, betweenEqual (disr. prev_send,   prev->sStop (),  prev->sStart ()));
+  QC_ASSERT (                         betweenEqual (disr. next_qstart, next->qStart (), next->qStop ()));
+  QC_IMPLY (prev->hsp. sInt. strand ==  1, betweenEqual (disr. next_sstart, next->sStart (), next->sStop ()));
+  QC_IMPLY (prev->hsp. sInt. strand == -1, betweenEqual (disr. next_sstart, next->sStop (),  next->sStart ()));
+#endif
 }
 
 
@@ -5558,8 +5875,8 @@ void Intron::saveText (ostream &os) const
 
   os << "Intron:"
      << " score=-" << score
-     << " prev_end=" << prev_end
-     << " next_start=" << next_start
+     << " prev_start=" << prev_start
+     << " next_stop=" << next_stop
      << " disr:";
   disr. saveText (os);
 
@@ -5570,12 +5887,196 @@ void Intron::saveText (ostream &os) const
 
 
 
-AlignScore Intron::getTotalScore ()
+AlignScore Intron::getTotalScore (AlignScore intronScore)
 {
+  ASSERT (intronScore > 0);
+  
+  if (score == score_inf)
+    return - score_inf;
+  
   const Exon* next = static_cast <const Exon*> (node [true]);
   ASSERT (next);
-  var_cast (next) -> setBestIntron ();  // DAG => no loop 
-  return next->totalScore - score;
+  var_cast (next) -> setBestIntron (intronScore);  // DAG => no loop 
+
+  return next->totalScore - score - min ((AlignScore) disr. getLen (), intronScore);
+}
+
+
+
+//
+
+struct DensityState
+{
+  // PAR  // optimize iteratively ??
+  static constexpr double loDensProb = 0.10;
+  static constexpr double hiDensProb = 0.90;  
+  static_assert (loDensProb < hiDensProb);
+  static constexpr double densChangeProb = 0.005;  
+  static_assert (densChangeProb < 0.5);
+  // > 0
+  static constexpr array<double,2/*bool match*/> loDensWeight {{-log (1.0 - loDensProb), -log (loDensProb)}};
+  static constexpr array<double,2/*bool match*/> hiDensWeight {{-log (1.0 - hiDensProb), -log (hiDensProb)}};
+  static constexpr array<double, 2/*bool densityChanged*/> densChangeWeight {{-log (1.0 - densChangeProb), -log (densChangeProb)}};
+
+  // To minimize
+  array<double,2/*bool highDensity*/> weightLocal;
+  array<double,2/*bool highDensity*/> weightGlobal {{0.0, 0.0}};
+  //
+  array<bool, 2/*bool highDensity*/> prevGlobalHiDens {{false, true}};
+
+  
+  explicit DensityState (bool match)
+    { weightLocal [false] = loDensWeight [match];
+      weightLocal [true]  = hiDensWeight [match];
+    }
+  void saveText (ostream &os) const
+    { const ONumber on (os, 2, false);
+      os         << weightLocal [false] 
+         << '\t' << weightLocal [true] 
+         << '\t' << weightGlobal [false] 
+         << '\t' << weightGlobal [true] 
+         << '\t' << (int) prevGlobalHiDens [false] 
+         << '\t' << (int) prevGlobalHiDens [true];
+    }
+};
+
+
+void hsp2exons (const Hsp& hsp,
+                DiGraph &graph,        
+              	const SubstMat* sm)
+{               
+  ASSERT (hsp. length);
+
+  // Dynamic programming
+  // hsp.c_complete == etrue ??
+  Vector<DensityState> dss;  dss. reserve (hsp. length);
+  FOR (size_t, i, hsp. length)
+  {
+    DensityState ds (hsp. charMatch (i));
+    // dc.{weightGlobal[],prevGlobalHiDens[]}
+    if (i)
+      for (const bool hiDens : {false, true})
+      {
+        ds. weightGlobal [hiDens] = numeric_limits<double>::infinity ();
+        for (const bool prevHiDens : {false, true})
+          if (minimize (ds. weightGlobal [hiDens], ds. weightLocal [hiDens] + dss. back (). weightGlobal [prevHiDens] + DensityState::densChangeWeight [hiDens != prevHiDens]))
+            ds. prevGlobalHiDens [hiDens] = prevHiDens;
+      }
+    else
+      ds. weightGlobal = ds. weightLocal;
+  #if 0
+    // Test: 
+    //   tblastn2disruption test.blast -noprogress -bacteria -qc -verbose 1
+    //     test.blast: CAA46767.1      JAOQKQ010000001.1       24      243     319     4725551 4726207 5298558 EFMIDFSTQQSYVSSLNSIRTEISTPL-EHISQGTTSVSVINHTPPGSYFAVDIRGLDVYQARFDHLRLIIEQNNLYVAGFVNTATNTFYRFSDFTHISVPGVTTVSMTTDSSYTTLQRVAALERSGMQISRHSLVSSYLALMEFSGNTMTRDASRAVLRFVTVTAEALRFRQIQREFRQALSETAPVYTMTPEEVDLTLNWGRISNVLPEFRGEGGVRVG EFMIDFSTQQSYVSSLNSIRTEISTPS*TYISGDHIGVCY*PH-PTGQLFCCGYTRA*CLSGAF*PSSSDY*AK*FICGWFVNTATNTFYRFSDFTHISVPGVTTVSMTTDSSYTTLQRVAALERSGMQISRHSLVSSYLALMELSGNTMTRDASRAVLRFVTVTAEALRFRQIQREFRQALSETAPVYTMTPEEVDLTLNWGESAMCFRSF-GERGCQSG
+    cout << i << '\t';
+    ds. saveText (cout);
+    cout << endl;
+  #endif
+    dss << std::move (ds);
+  }
+      
+  bool hiDens = (   dss. back (). weightGlobal [true] 
+                 <= dss. back (). weightGlobal [false]
+                );
+  size_t stop  = hsp. length;
+  size_t start = hsp. length - 1;
+  while (start)
+  {
+    while (start && dss [start]. prevGlobalHiDens [hiDens] == hiDens)
+      start--;  
+    auto exon = new Exon (graph, ! hiDens, hsp, start, stop - start, sm);
+    exon->qc ();
+  // !hiDens => add Disruption to exon->disrs ??
+    stop = start;
+    toggle (hiDens);
+  }
+}
+
+
+}  // namespace
+
+
+
+
+Vector<Hsp> Hsp::merge (const VectorPtr<Hsp> &hsps,
+                        VectorPtr<Hsp> &firstOrigHsps,
+                        const SubstMat* sm,
+                        AlignScore intronScore,
+                        bool bacteria)
+{
+  DiGraph graph;  // of Exon, Intron
+  for (const Hsp* hsp : hsps)
+  {
+    ASSERT (hsp);
+    hsp2exons (*hsp, graph, sm); 
+  }	
+  for (DiGraph::Node* node1 : graph. nodes)
+  {
+    Exon* next = static_cast <Exon*> (node1);
+    ASSERT (next);
+    for (DiGraph::Node* node2 : graph. nodes)
+	  {
+      Exon* prev = static_cast <Exon*> (node2);
+      ASSERT (prev);
+      if (prev->arcable (*next, bacteria))
+        new Intron (var_cast (prev), var_cast (next));
+    }
+	}
+	graph. qc ();
+	
+	  	
+	Vector<Hsp> mergedHsps;
+	for (;;)
+	{
+    for (DiGraph::Node* node : graph. nodes)
+    {
+      Exon* exon = static_cast <Exon*> (node);
+      ASSERT (exon);
+      exon->bestIntronSet = false;
+    }
+
+  	const Exon* bestExon = nullptr;
+  	AlignScore totalScore_max = - score_inf;
+  	if (verbose ())
+	    cout << endl << "Graph:" << endl;
+    for (DiGraph::Node* node : graph. nodes)
+    {
+      Exon* exon = static_cast <Exon*> (node);
+      ASSERT (exon);
+      exon->setBestIntron (intronScore);
+      if (verbose ())
+      {
+        exon->saveText (cout);
+        cout << endl;
+      }
+      if (maximize (totalScore_max, exon->totalScore))
+        bestExon = exon;
+    }
+    if (! bestExon)
+      break;
+    ASSERT (totalScore_max > - score_inf);
+
+    const Hsp* firstOrigHsp = nullptr;
+    Hsp hsp_new (var_cast (bestExon) -> mergeTail (firstOrigHsp));
+    ASSERT (firstOrigHsp);
+    ASSERT (! firstOrigHsp->merged);
+    if (hsp_new. nident)
+    {
+      // N/C-terminus deletion: add Disruption ??
+      hsp_new. disrs. sort ();
+      hsp_new. qc ();
+      mergedHsps << std::move (hsp_new);
+      firstOrigHsps << firstOrigHsp;   
+    } 
+        
+    delete bestExon; 
+  //break;  // If only the best match is needed ??
+  }
+  graph. qc ();
+//ASSERT (mergedHsps. size () <= hsps. size ());
+  
+  
+  return mergedHsps;
 }
 
 

@@ -1960,7 +1960,7 @@ StringVector::StringVector (const string &fName,
                             size_t reserve_size,
                             bool trimP)
 {
-	searchSorted = true;
+	ascending = etrue;
 	
 	reserve (reserve_size);
   try
@@ -1972,8 +1972,8 @@ StringVector::StringVector (const string &fName,
       if (trimP)
         trim (f. line);
       *this << f. line;
-  	  if (f. line < prev)
-  	  	searchSorted = false;
+  	  if (lt (f. line, prev))
+  	  	ascending = enull;
       prev = std::move (f. line);
     }
   }
