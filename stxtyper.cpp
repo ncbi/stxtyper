@@ -32,6 +32,7 @@
 * Dependencies: NCBI BLAST, gunzip (optional)
 *
 * Release changes:
+*  1.0.45 07/16/2025 PD-5392  C++ constexpr cannot have "log" in MacOS
 *  1.0.44 05/14/2025 PD-5329  New struct Hsp
 *         04/25/2025 PD-5301  C++ refactoring: struct Hsp; trailing stop codons are not counted as nident
 *  1.0.43 03/25/2025          -help or -version with other parameters is an error
@@ -634,25 +635,25 @@ VectorPtr<BlastAlignment> processDisruptions (VectorPtr<Hsp> &hsps)
   if (hsps. empty ())
     return newAls;
   
-  VectorPtr<Hsp> firstOrigHsps;   // Subset of hsps
-  const Vector<Hsp> mergedHsps (Hsp::merge (hsps, firstOrigHsps, nullptr/*sm*/, 20/*intronScore*/, true/*bacteria*/));  // PAR
-//ASSERT (mergedHsps. size () <= hsps. size ());
-  ASSERT (mergedHsps. size () == firstOrigHsps. size ());
-  ASSERT (hsps. containsAll (firstOrigHsps));      
-        
   VectorOwn<BlastAlignment> newAls_;
   bool hasDisruptions = false;
-  FFOR (size_t, i, mergedHsps. size ())
   {
-    const Hsp* origHsp = firstOrigHsps [i];  // Matches mergedHsps[i]
-    ASSERT (origHsp);
-    ASSERT (! origHsp->merged);
-    auto al = new BlastAlignment (* static_cast <const BlastAlignment*> (origHsp));
-    * static_cast <Hsp*> (al) = std::move (mergedHsps [i]);
-    al->qc ();
-    newAls_ << al;
-    if (! al->disrs. empty ())
-      hasDisruptions = true;
+    Hsp::Merge merge (hsps, nullptr/*sm*/, 20, true/*bacteria*/);  // PAR
+    for (;;)
+    { 
+      const Hsp* origHsp = nullptr;
+      AlignScore score = - score_inf;
+      Hsp hsp (merge. get (origHsp, score)); 
+      if (hsp. empty ()) 
+        break; 
+      ASSERT (origHsp);
+      auto al = new BlastAlignment (* static_cast <const BlastAlignment*> (origHsp));
+      * static_cast <Hsp*> (al) = std::move (hsp);
+      al->qc ();
+      newAls_ << al;
+      if (! al->disrs. empty ())
+        hasDisruptions = true;
+    }
   }
   
   if (hasDisruptions)
@@ -884,7 +885,7 @@ struct ThisApplication final : ShellApplication
  			exec (fullProg ("makeblastdb") + "-in " + dna_flat + "  -dbtype nucl  -out " + tmp + "/db  -logfile " + tmp + "/db.log  > /dev/null", tmp + "db.log");
  			findProg ("tblastn");
 			exec (fullProg ("tblastn") + " -query " + execDir + "stx.prot  -db " + tmp + "/db"
-			      + Hsp::blastp_par_fast + "  -gapextend 2  -db_gencode " + to_string (gencode) 
+			      + Hsp::blastp_fast + "  -gapextend 2  -db_gencode " + to_string (gencode) 
 			      + "  -mt_mode 1  -num_threads " + to_string (threads_max)  // Reduces time by 30% for large DNA
 			      + " " + Hsp::format_par (true) + " -out " + blastOut + " > /dev/null 2> " + tmp + "/blast-err", tmp + "/blast-err");
 		}

@@ -37,6 +37,7 @@
 
 
 #include "common.hpp"
+#include "graph.hpp"
 using namespace Common_sp;
 
 
@@ -1307,6 +1308,7 @@ struct Disruption : Root
     // In prev->qseq/sseq
   size_t next_stop {no_index};
     // In next->qseq/sseq
+  bool intron {false};
   enum Type {eNone, eSmooth, eFrameshift, eDeletion/*or replacement*/, eInsertion};
   static const StringVector typeNames;
   static constexpr const char* stopSuf {"_STOP"};
@@ -1315,11 +1317,13 @@ struct Disruption : Root
   Disruption (const Hsp& prev_arg,
               const Hsp& next_arg,
               size_t prev_start_arg,
-              size_t next_stop_arg)
+              size_t next_stop_arg,
+              bool intron_arg)
     : prev (& prev_arg)
     , next (& next_arg)
     , prev_start (prev_start_arg)
     , next_stop  (next_stop_arg)
+    , intron (intron_arg)
     {}
   Disruption () = default;
   bool empty () const override
@@ -1477,9 +1481,10 @@ public:
                                                           };
   static string format_par (bool forward)
     { return string ("  -outfmt '6 ") + format [forward] + "'"; }
-  static constexpr const char* blastp_par_fast {"  -comp_based_stats 0  -seg no  -max_target_seqs 10000  -dbsize 10000  -evalue 1e-10  -word_size 5"};
-	  // was: -culling_limit 20  // PD-2967
-  static constexpr const char* blastp_par_slow {"  -comp_based_stats 0  -seg no  -max_target_seqs 10000  -dbsize 10000  -evalue 1      -word_size 3"};
+  static constexpr const char* blastp_fast {"  -comp_based_stats 0  -seg no  -max_target_seqs 10000  -dbsize 10000  -evalue 1e-10  -word_size 5"};
+	  // "-culling_limit 20": PD-2967
+    // "-threshold 100 -window_size 15" are faster, but may miss hits, see SB-3643
+  static constexpr const char* blastp_slow {"  -comp_based_stats 0  -seg no  -max_target_seqs 10000  -dbsize 10000  -evalue 1      -word_size 3"};
     // To get short frame shifts
     // -word_size 4  -matrix IDENTITY: does not allow flipping frameshifts, e.g., CAA46767.1 in JAOQKQ010000001.1
 			// -word_size 5: SB-4418 
@@ -1561,6 +1566,17 @@ public:
              && c_complete != efalse; 
     }
     
+  string cleanQseq () const
+    { string s (qseq);
+      replaceStr (s, "-", noString);
+      return s;
+    }
+  string cleanSseq () const
+    { string s (sseq);
+      replaceStr (s, "-", noString);
+      return s;
+    }
+    
   // For blastx()
   bool sTruncated () const
     { return    (sInt. start       < a2s && ((sInt. strand == 1 && qInt. start)       || (sInt. strand == -1 && qInt. stop < qlen)))
@@ -1611,16 +1627,32 @@ public:
           return true;
       return false;
     }    
+
     
-  static Vector<Hsp> merge (const VectorPtr<Hsp> &hsps,
-                            VectorPtr<Hsp> &firstHsps,
-                            const SubstMat* sm,
-                            AlignScore intronScore,
-                            bool bacteria);
-    // Return: merged Hsp's; Hsp::merged; size() <= hsps.size(); ordered by score descending
-    // Input: hsps: unique Hsp's with disr.empty()
-    // Output: firstHsps: Hsp's matching to Return; size() = Return.size(); subset of hsps; !merged
-    // Time: n^2, where n = hsps.size()
+  struct Merge : Root
+  // Usage: Merge m; for(;;) { Hsp hsp (m.get()); if (hsp.empty()) break; ... }
+  {
+    const VectorPtr<Hsp>& origHsps;
+      // unique, !merged
+    const AlignScore intronScore;
+  private:
+    DiGraph graph;  // of Exon, Intron
+  public:
+        
+    Merge (const VectorPtr<Hsp> &origHsps_arg,
+           const SubstMat* sm,
+           AlignScore intronScore_arg,
+           bool bacteria);
+      // Input: intronScore_arg >= 0
+      // Time: n^2, where n = origHsps.size()
+                            
+    Hsp get (const Hsp* &origHsp,
+             AlignScore &score);
+      // Return: merged
+      // Output: origHsp: in origHsps, first merged Hsp
+      // Invocation returns: ordered by score descending
+      // Number of invocations <= origHsps.size()
+  };
 };
 
 
