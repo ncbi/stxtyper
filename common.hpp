@@ -155,6 +155,16 @@ void errorExitStr (const string &msg);
   // For debugger: should not be inline
   // Invokes: throw logic_error
 
+inline void reportException (const string &msg,
+                             const exception &e,
+                             bool force)
+  { const string s (msg + ": " + e. what ());
+    if (force)
+      cerr << s << endl;
+    else
+      throw runtime_error (s);
+  }    	    	
+
 
 void sleepNano (long nanoSec);
 
@@ -770,7 +780,7 @@ void trimSuffixNonAlphaNum (string &s);
 
 bool trimTailAt (string &s,
                  const string &tailStart);
-  // Return: trimmed
+  // Return: trimmed; tailStart.empty() => false
   // Update: s
 
 void trimLeading (string &s);
@@ -839,8 +849,8 @@ void replace (string &s,
 void replaceStr (string &s,
                  const string &from,
                  const string &to);
-  // Replaces "from" by "to" in s from left to right
-  // The replacing "to" is skipped if it contains "from"
+  // Replaces <from> by <to> in s from left to right
+  // If <to> contains <from> then the replacing <to> is skipped else postcondtion is that s does not contain <from>
   // Requires: !from.empty()
 
 string to_c (const string &s);
@@ -2111,10 +2121,6 @@ public:
       saveText (oss);
       return oss. str ();
     }
-#if 0
-  void trace (ostream& os,
-              const string& title) const;
-#endif
   virtual void saveXml (Xml::File& /*f*/) const 
     { throwf ("Root::saveXml() is not implemented"); }
   virtual Json* toJson (JsonContainer* /*parent_arg*/,
@@ -2237,7 +2243,7 @@ template <typename T>
   private:
   	typedef  vector<T>  P;
   public:
-    bool searchSorted {false};
+    ebool ascending {enull};
   	
 
   	Vector () = default;
@@ -2265,7 +2271,7 @@ template <typename T>
   public:
     void unsetSearchSorted ()
       { if (P::size () > 1)
-          searchSorted = false;
+          ascending = enull;
       }
   	typename P::reference operator[] (size_t index)
   	  { checkIndex ("assignment", index);
@@ -2344,9 +2350,16 @@ template <typename T>
       }
       // a = v.overlapStart_min(v,1), a < v.size(), v.size() % a == 0 => a is the period of v
     void checkSorted () const
-      { if (! searchSorted)
+      { if (ascending == enull)
       	  throw runtime_error ("Vector is not sorted for search");
       }
+    template <typename U>
+      void checkSorted (const Vector<U> &other) const
+        { checkSorted ();
+          other. checkSorted ();
+          if (ascending != other. ascending)
+            throw logic_error ("Different ordering direction of two vectors");
+        }
     Vector<T>& operator<< (const T &value)
       { P::push_back (value);
         unsetSearchSorted ();
@@ -2419,7 +2432,7 @@ template <typename T>
       			break;
       	  std::swap ((*this) [i], (*this) [j]);
       	}
-       unsetSearchSorted ();
+        toggle (ascending);
       }
     const T& getRandom (Rand &rand) const
       { return (*this) [rand. get (P::size ())]; }
@@ -2488,27 +2501,34 @@ template <typename T>
         }
 
     void sort ()
-      { if (searchSorted)
+      { if (ascending == etrue)
           return;
         Common_sp::sort (*this); 
-        searchSorted = true;
+        ascending = etrue;
       }
     template <typename StrictlyLess>
       void sort (const StrictlyLess &strictlyLess)
         { Common_sp::sort (*this, strictlyLess); 
           unsetSearchSorted ();
         }    
+    bool lt (const T& t1,
+             const T& t2) const
+      { if (ascending == etrue)
+          return t1 < t2;
+        return t2 < t1;
+      }
+      // Requires: acsending != enull
     void sortBubble ()  
       // Fast if *this is almost sort()'ed
-      { if (searchSorted)
+      { if (ascending == etrue)
           return;
         for (size_t i = 1; i < P::size (); i++)
   		    for (size_t j = i; j-- > 0;)
-  		      if ((*this) [j + 1] < (*this) [j])
-          	  std::swap ((*this) [j], (*this) [j + 1]);
+  		      if (lt ((*this) [j + 1], (*this) [j]))
+          	  std::swap ((*this) [j + 1], (*this) [j]);
   		      else
   		      	break;
-      	searchSorted = true;
+      	ascending = etrue;
       }
 
     size_t binSearch (const T &value,
@@ -2523,7 +2543,7 @@ template <typename T>
       	  {
       	    if (value == (*this) [i])
           	  return i;
-      	    if (value < (*this) [i])
+      	    if (lt (value, (*this) [i]))
           	  return exact ? no_index : i;
           }
           return no_index;
@@ -2531,16 +2551,16 @@ template <typename T>
       	size_t lo = 0;  // vec.at(lo) <= value
       	size_t hi = P::size () - 1;  
       	// lo <= hi
-      	if (value < (*this) [lo])
+      	if (lt (value, (*this) [lo]))
       	  return exact ? no_index : lo;
-      	if ((*this) [hi] < value)
+      	if (lt ((*this) [hi], value))
       	  return no_index;
       	// at(lo) <= value <= at(hi)
       	for (;;)
       	{
   	    	const size_t m = (lo + hi) / 2;
-  	    	if (   (*this) [m] == value
-  	    		  || (*this) [m] <  value
+  	    	if (       (*this) [m] == value
+  	    		  || lt ((*this) [m],   value)
   	    		 )
   	    		if (lo == m)  // hi in {lo, lo + 1}
   	    			break;
@@ -2605,12 +2625,11 @@ template <typename T>
         }
     template <typename U>
       bool intersectsFast_merge (const Vector<U> &other) const
-        { checkSorted ();
-        	other. checkSorted ();
+        { checkSorted (other);
         	size_t i = 0;
         	const size_t otherSize = other. size ();
           for (const T& t : *this)
-          { while (i < otherSize && other [i] < t)
+          { while (i < otherSize && lt (other [i], t))
               i++;
             if (i == otherSize)
               return false;
@@ -2668,12 +2687,11 @@ template <typename T>
       // Input: *this, vec: unique
       { if (other. empty ())
           return 0;
-        checkSorted ();
-        other. checkSorted ();      
+        checkSorted (other);
         size_t n = 0;
         size_t j = 0;
         for (const T& x : *this)
-        { while (other [j] < x)
+        { while (lt (other [j], x))
           { j++;
             if (j == other. size ())
               return n;
@@ -2688,11 +2706,10 @@ template <typename T>
       { Vector<T> res;
         if (other. empty ())
           return res;
-        checkSorted ();
-        other. checkSorted ();      
+        checkSorted (other);
         size_t j = 0;
         for (const T& x : *this)
-        { while (other [j] < x)
+        { while (lt (other [j], x))
           { j++;
             if (j == other. size ())
               return res;
@@ -2700,7 +2717,7 @@ template <typename T>
           if (other [j] == x)
             res << x;
         }
-        res. searchSorted = true;
+        res. ascending = ascending;
         return res;
       }
     bool setIntersection (const Vector<T> &other)
@@ -2711,7 +2728,7 @@ template <typename T>
         { Vector<T> vec (getIntersection (other));
           *this = std::move (vec);
         }
-        searchSorted = true;
+        ascending = other. ascending;
         return ! P::empty ();
       }
     Vector<T> getUnion (const Vector<T> &other) const
@@ -2721,11 +2738,10 @@ template <typename T>
           return *this;
         if (P::empty ())
           return other;
-        checkSorted ();
-        other. checkSorted ();      
+        checkSorted (other);
         size_t j = 0;
         for (const T& x : *this)
-        { while (j < other. size () && other [j] < x)
+        { while (j < other. size () && lt (other [j], x))
           { res << other [j];
             j++;
           }
@@ -2737,7 +2753,7 @@ template <typename T>
         { res << other [j];
           j++;
         }
-        res. searchSorted = true;
+        res. ascending = ascending;
         return res;
       }
     void setUnion (const Vector<T> &other)
@@ -2814,7 +2830,7 @@ template <typename T /* : Root */>
     	  : P ()
     	  { P::reserve (other. size ());
     	    insertAll (*this, other);
-    	    P::searchSorted = other. searchSorted;
+    	    P::ascending = other. ascending;
     	  }	  
   	template <typename U>
     	explicit VectorPtr (const list<const U*> &other)
@@ -2827,7 +2843,7 @@ template <typename T /* : Root */>
     	  { P::clear ();
     	    P::reserve (other. size ());
     	    insertAll (*this, other);
-    	    P::searchSorted = other. searchSorted;
+    	    P::ascending = other. ascending;
     	    return *this;
     	  }	  
 
@@ -2931,7 +2947,7 @@ template <typename T /* : Root */>
   	  	P::reserve (other. size ());
   	  	for (const T* t : other)
   	  	  P::push_back (static_cast <const T*> (t->copy ()));
-  	  	P::searchSorted = other. searchSorted;
+  	  	P::ascending = other. ascending;
   	  	return *this;
   	  }
   	VectorOwn (VectorOwn<T> &&other)
@@ -2940,7 +2956,7 @@ template <typename T /* : Root */>
   	VectorOwn<T>& operator= (VectorOwn<T> &&other)
   	  { P::deleteData ();
   	    P::operator= (std::move (other)); 
-  	  	P::searchSorted = other. searchSorted;
+  	  	P::ascending = other. ascending;
   	    return *this;
   	  }
   	explicit VectorOwn (const VectorPtr<T> &other)
@@ -2949,7 +2965,7 @@ template <typename T /* : Root */>
   	VectorOwn<T>& operator= (const VectorPtr<T> &other) 
   	  { P::deleteData ();
   	    P::operator= (other); 
-  	    P::searchSorted = other. searchSorted;
+  	    P::ascending = other. ascending;
   	    return *this;
   	  }
   	explicit VectorOwn (VectorPtr<T> &&other)
@@ -2958,7 +2974,7 @@ template <typename T /* : Root */>
   	VectorOwn<T>& operator= (VectorPtr<T> &&other) 
   	  { P::deleteData ();
   	    P::operator= (std::move (other)); 
-  	  	P::searchSorted = other. searchSorted;
+  	  	P::ascending = other. ascending;
   	    return *this;
   	  }
    ~VectorOwn ()
@@ -3254,7 +3270,7 @@ public:
     {}
   explicit StringVector (const Set<string> &from)
     { insertAll (*this, from); 
-      searchSorted = true;
+      ascending = etrue;
     }
   StringVector (const string &fName,
                 size_t reserve_size,
@@ -3871,6 +3887,7 @@ public:
 
 	  
 	bool next ();
+	  // Output: name1, name2
 	uint getLineNum () const
 	  { return f. lineNum; }
 	  // Requires: after next()
@@ -3903,7 +3920,6 @@ public:
   string getLine ();
     // Postcondition: tp.eol()
 	  
-
   [[noreturn]] void error (const string &what,
 	                         bool expected = true) const
 		{ throw TextPos::Error (tp, what, expected); }
@@ -3920,7 +3936,9 @@ struct Token : Root
 	          , eDouble
 	          , eDateTime  // Example: 2018-08-13T16:12:54.487
 	          };
- // Valid if !empty()
+  // Valid if !empty()
+	TextPos tp;
+    // = CharInput::tp
 	Type type {eDelimiter};
 	bool dashInName {false};
 	string name;
@@ -3933,9 +3951,7 @@ struct Token : Root
 	double d {0.0};
   // Valid if eDouble
 	streamsize decimals {0};
-	bool scientific {false};	  
-	TextPos tp;
-    // = CharInput::tp
+	bool scientific {false};	 
 
 	  
 	Token () = default;
@@ -3965,24 +3981,28 @@ struct Token : Root
 	  {}
 	Token (CharInput &in,
 	       bool dashInName_arg,
-	       bool consecutiveQuotesInText)
-	  { readInput (in, dashInName_arg, consecutiveQuotesInText); }
+	       bool consecutiveQuotesInText,
+	       bool negativeInteger)
+	  { readInput (in, dashInName_arg, consecutiveQuotesInText, negativeInteger); }
 	Token (CharInput &in,
 	       Type expected,
 	       bool dashInName_arg,
-	       bool consecutiveQuotesInText)
-    { readInput (in, dashInName_arg, consecutiveQuotesInText);
+	       bool consecutiveQuotesInText,
+	       bool negativeInteger)
+    { readInput (in, dashInName_arg, consecutiveQuotesInText, negativeInteger);
     	if (empty ())
  			  in. error ("No token", false); 
     	if (type != expected)
  			  in. error (type2str (type)); 
     }
-private:
+private:  
 	void readInput (CharInput &in,
 	                bool dashInName_arg,
-	                bool consecutiveQuotesInText);  
+	                bool consecutiveQuotesInText,
+	                bool negativeInteger);  
 	  // Input: consecutiveQuotesInText means that '' = '
     // Update: in: in.charNum = last character of *this
+    // --> TokenInput ??
 public:
 	void qc () const override;
 	void saveText (ostream &os) const override;
@@ -4053,10 +4073,13 @@ struct TokenInput : Root
 {
 private:
   CharInput ci;
+public:
   const char commentStart;
   const bool dashInName;
   const bool consecutiveQuotesInText;
     // Two quotes encode one quote
+  const bool negativeInteger;
+private:
   Token last;
 	TextPos tp;
 public:
@@ -4066,21 +4089,25 @@ public:
                        char commentStart_arg = '\0',
                        bool dashInName_arg = false,
                        bool consecutiveQuotesInText_arg = false,
+                       bool negativeInteger_arg = false,
                        uint displayPeriod = 0)
     : ci (fName, displayPeriod)
     , commentStart (commentStart_arg)
     , dashInName (dashInName_arg)
     , consecutiveQuotesInText (consecutiveQuotesInText_arg)
+    , negativeInteger (negativeInteger_arg)
     {}
   explicit TokenInput (istream &is_arg,
                        char commentStart_arg = '\0',
                        bool dashInName_arg = false,
                        bool consecutiveQuotesInText_arg = false,
+                       bool negativeInteger_arg = false,
                        uint displayPeriod = 0)
     : ci (is_arg, displayPeriod)
     , commentStart (commentStart_arg)
     , dashInName (dashInName_arg)
     , consecutiveQuotesInText (consecutiveQuotesInText_arg)
+    , negativeInteger (negativeInteger_arg)
     {}
 
 

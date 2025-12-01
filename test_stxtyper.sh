@@ -4,11 +4,11 @@ if [ "$1" == "path" ]
 then
     echo "Testing stxtyper command in your \$PATH"
     which stxtyper
-    STXTYPER=stxtyper
+    STXTYPER="stxtyper --debug"
 else
     echo "Testing ./stxtyper"
     echo "  To test stxtyper in your path run 'test_stxtyper.sh path'"
-    STXTYPER=./stxtyper
+    STXTYPER="./stxtyper  --debug"
 fi
 
 if [ ! -e "test/basic.expected" ]

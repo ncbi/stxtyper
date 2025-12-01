@@ -291,8 +291,8 @@ string getStack ()
   string s;
   constexpr size_t size = 100;  // PAR
   void* buffer [size];
-  const int nptrs = backtrace (buffer, size);
-  if (nptrs <= 1)  // *this function must be the first one
+  const int nptrs = backtrace (buffer, size);  // This function must be the first one
+  if (nptrs <= 1)  
     errorExit (("backtrace size is " + to_string (nptrs)). c_str ());
   char** strings = backtrace_symbols (buffer, nptrs);
   if (strings /*&& ! which ("addr2line"). empty ()*/) 
@@ -634,8 +634,11 @@ void trimSuffixNonAlphaNum (string &s)
 bool trimTailAt (string &s,
                  const string &tailStart)
 {
+  if (tailStart. empty ())
+    return false;
+    
   const size_t pos = s. find (tailStart);
-  const bool trimmed = pos != string::npos;
+  const bool trimmed = (pos != string::npos);
   if (trimmed)
     s. erase (pos);
   return trimmed;
@@ -1361,6 +1364,12 @@ string makeTempDir ()
 		throw runtime_error ("Cannot create a temporary directory in " + tmpDir);
 
   {
+  #if 0
+  //#include <sys/statvfs.h>
+    struct statvfs vfs;
+    if (statvfs("/tmp", &vfs) == 0) 
+      vfs.f_bsize * vfs.f_bavail  // contains the free space availab
+  #else
   	const string testFName (tmp + "/test");
     {
       ofstream f (testFName);
@@ -1369,6 +1378,7 @@ string makeTempDir ()
 		    throw runtime_error (tmpDir + " is full, make space there or use environment variable TMPDIR to change location for temporary files");
     }
     removeFile (testFName);
+  #endif
   }
 
   return tmp;  
@@ -1939,21 +1949,6 @@ void Root::saveFile (const string &fName) const
 
 
 
-#if 0
-void Root::trace (ostream& os,
-                  const string& title) const
-{ 
-  if (! verbose ())
-    return;
-  Offset::newLn (os);
-  os << title << ": ";
-  saveText (os);
-}
-#endif
-
-
-
-
 // Named
 
 void Named::qc () const
@@ -1975,7 +1970,7 @@ StringVector::StringVector (const string &fName,
                             size_t reserve_size,
                             bool trimP)
 {
-	searchSorted = true;
+	ascending = etrue;
 	
 	reserve (reserve_size);
   try
@@ -1987,8 +1982,8 @@ StringVector::StringVector (const string &fName,
       if (trimP)
         trim (f. line);
       *this << f. line;
-  	  if (f. line < prev)
-  	  	searchSorted = false;
+  	  if (lt (f. line, prev))
+  	  	ascending = enull;
       prev = std::move (f. line);
     }
   }
@@ -2266,12 +2261,7 @@ bool LineInput::nextLine ()
         
   	const bool end = line. empty () && eof;
 
-    if (! commentStart. empty ())
-    {
-      const size_t pos = line. find (commentStart);
-      if (pos != string::npos)
-        line. erase (pos);
-    }
+    trimTailAt (line, commentStart);
   //trimTrailing (line); 
 
   	if (! end)
@@ -2344,7 +2334,8 @@ string CharInput::getLine ()
 
 void Token::readInput (CharInput &in,
                        bool dashInName_arg,
-                       bool consecutiveQuotesInText)
+                       bool consecutiveQuotesInText,
+                       bool negativeInteger)
 {
 	ASSERT (empty ());
 
@@ -2358,9 +2349,9 @@ void Token::readInput (CharInput &in,
 		
 	tp = in. tp;
 
-	if (   c == '\'' 
-	    || c == '\"'
-	   )
+  if (   c == '\'' 
+      || c == '\"'
+     )
 	{
 		type = eText;
 		quote = c;
@@ -2396,7 +2387,7 @@ void Token::readInput (CharInput &in,
 			name += c;
 		}
 	}
-	else if (isDigit (c) || c == '-')
+	else if (isDigit (c) || (negativeInteger && c == '-'))
 	{
 	  bool minusPossible = true;
 		while (   ! in. eof 
@@ -2612,7 +2603,7 @@ Token TokenInput::get ()
     
   for (;;)  
   { 
-    Token t (ci, dashInName, consecutiveQuotesInText);
+    Token t (ci, dashInName, consecutiveQuotesInText, negativeInteger);
     if (t. empty ())
       break;
     tp = t. tp;
@@ -2632,110 +2623,124 @@ Token TokenInput::getXmlText ()
 
 
   Token t;
-  t. tp = ci. tp;
-  size_t htmlTags = 0;
-  bool prevSlash = false;
-	for (;;)
-	{ 
-    // break
-	  char c = ci. get (); 
-		if (ci. eof)
-	    ci. error ("XML text is not finished: end of file\n" + t. name, false);
-	  if (c == '<')
-	  {
-	    const char nextChar = getNextChar (true);
-	    if (nextChar == '/')
-	    {
-	      if (htmlTags)
-	        htmlTags--;
-	      else
-	        break;
-	    }
-	    else if (   nextChar != '?' 
-	             && nextChar != '!' 
-	            )
-	      htmlTags++;
-	  }
-	  else if (c == '>')
-	    if (prevSlash && htmlTags)
-	      htmlTags--;
+  try
+  {
+    t. tp = ci. tp;
+    size_t htmlTags = 0;
+    bool prevSlash = false;
+  	for (;;)
+  	{ 
+      // break
+  	  char c = ci. get (); 
+  		if (ci. eof)
+  	    ci. error ("XML text is not finished: end of file\n" + t. name, false);
+  	  if (c == '<')
+  	  {
+  	    const char nextChar = getNextChar (true);
+  	    if (nextChar == '/')
+  	    {
+  	      if (htmlTags)
+  	        htmlTags--;
+  	      else
+  	        break;
+  	    }
+  	    else if (   nextChar != '?' 
+  	             && nextChar != '!' 
+  	            )
+  	      htmlTags++;
+  	  }
+  	  else if (c == '>')
+  	    if (prevSlash && htmlTags)
+  	      htmlTags--;
 
-    // Escaped character
-    int n = c;
-    if (n < 0)
-      n += 256;
-  	if (c == '&')
-  	{
-      if (ci. get () == '#')  // Number
-      {
-        if (ci. get () == 'x')
+      // Escaped character
+      int n = c;
+      if (n < 0)
+        n += 256;
+    	if (c == '&')
+    	{
+        if (ci. get () == '#')  // Number
         {
-          static const string err (" of an escaped hexadecimal of XML text"); 
-          c = ci. get ();
-          if (ci. eof)
-            ci. error ("First digit" + err + ": end of file", false);
-          if (! isHex (c))
-            ci. error ("Digit" + err);
-          const uchar uc = uchar (hex2uchar (c) * 16);
-          c = ci. get ();
-          if (ci. eof)
-            ci. error ("Second digit" + err + ": end of file", false);
-          if (! isHex (c))
-            ci. error ("Second digit" + err);
-          n = uc + hex2uchar (c);
+          if (ci. get () == 'x')
+          {
+            static const string err (" of an escaped hexadecimal of XML text"); 
+            n = 0;
+            size_t i = 0;
+            for (;;)
+            {
+              c = ci. get ();
+              i++;
+              if (ci. eof)
+                ci. error ("Digit #" + to_string (i) + err + ": end of file", false);
+              if (c == ';')
+              {
+                ci. unget ();
+                break;
+              }
+              if (! isHex (c))
+                ci. error ("Digit" + err);
+              if (i > 4)  // PAR
+                ci. error ("Too long character" + err);  // Unicode ??!
+              n = n * 16 + hex2uchar (c);
+            }
+          }
+          else
+          {
+            ci. unget ();
+            const Token ampToken (get ());
+            if (ampToken. type != Token::eInteger)
+              ci. error ("Number after XML &");
+            if (ampToken. n < 0)
+              ci. error ("Character number after XML &");
+            n = (int) ampToken. n;
+          }
         }
         else
         {
           ci. unget ();
           const Token ampToken (get ());
-          if (ampToken. type != Token::eInteger)
-            ci. error ("Number after XML &");
-          if (ampToken. n < 0)
-            ci. error ("Character number after XML &");
-          n = (int) ampToken. n;
+          if (ampToken. isName ("amp"))
+            n = '&';
+          else if (ampToken. isName ("lt"))
+            n = '<';
+          else if (ampToken. isName ("gt"))
+            n = '>';
+          else if (ampToken. isName ("apos"))
+            n = '\''; 
+          else if (ampToken. isName ("quot"))
+            n = '\"'; 
+          else
+            ci. error ("Unknown XML &-symbol: " + strQuote (ampToken. name), false);
         }
-      }
+        get (';');
+    	}
+
+      // t.name
+      QC_ASSERT (n > 0);
+  	  if (nonPrintable (n))
+  			t. name += nonPrintable2str ((char) n);
       else
       {
-        ci. unget ();
-        const Token ampToken (get ());
-        if (ampToken. isName ("amp"))
-          n = '&';
-        else if (ampToken. isName ("lt"))
-          n = '<';
-        else if (ampToken. isName ("gt"))
-          n = '>';
-        else if (ampToken. isName ("apos"))
-          n = '\''; 
-        else if (ampToken. isName ("quot"))
-          n = '\"'; 
+        if (isChar (n))
+  		    t. name += char (n);
         else
-          ci. error ("Unknown XML &-symbol: " + strQuote (ampToken. name), false);
+          t. name += "&#" + to_string (n) + ";";
       }
-      get (';');
+
+  		prevSlash = (c == '/');		  
   	}
+  	
 
-    // t.name
-    QC_ASSERT (n > 0);
-	  if (nonPrintable (n))
-			t. name += nonPrintable2str ((char) n);
+  	trim (t. name);
+  	if (! t. name. empty ())
+      t. type = Token::eText;  
     else
-    {
-      if (isChar (n))
-		    t. name += char (n);
-      else
-        t. name += "&#" + to_string (n) + ";";
-    }
-
-		prevSlash = (c == '/');		  
-	}
-	
-
-	trim (t. name);
-	if (! t. name. empty ())
-    t. type = Token::eText;  
-  else
-    { ASSERT (t. empty ()); }
+      { ASSERT (t. empty ()); }
+  }
+  catch (const exception &e)
+  {
+    throw runtime_error ("Previous text:\n" + t. name + "\n" + e. what ());
+  }
 	
 
   return t;
@@ -3090,9 +3095,9 @@ void Json::parse (CharInput& in,
           new JsonString (firstToken. name, parent, name);
       }
       break;
-    case Token::eText: new JsonString (firstToken. name, parent, name); break;
-    case Token::eInteger: new JsonInt (firstToken. n, parent, name); break;
-    case Token::eDouble: new JsonDouble (firstToken. d, firstToken. decimals, parent, name); break;
+    case Token::eText:    new JsonString (firstToken. name, parent, name); break;
+    case Token::eInteger: new JsonInt    (firstToken. n, parent, name); break;
+    case Token::eDouble:  new JsonDouble (firstToken. d, firstToken. decimals, parent, name); break;
     case Token::eDelimiter:
       switch (firstToken. name [0])
       {
@@ -3215,14 +3220,14 @@ JsonArray::JsonArray (CharInput& in,
   bool first = true;
   for (;;)
   {
-    Token token (in, false, false);
+    Token token (in, false, false, true);
     if (token. isDelimiter (']'))
       break;
     if (! first)
     {
       if (! token. isDelimiter (','))
         in. error ("\',\'");
-      token = Token (in, false, false);
+      token = Token (in, false, false, true);
     }
     parse (in, token, this, noString);
     first = false;
@@ -3261,7 +3266,7 @@ JsonMap::JsonMap ()
 JsonMap::JsonMap (const string &fName)
 {
   CharInput in (fName);
-  const Token token (in, false, false);
+  const Token token (in, false, false, true);
   if (! token. isDelimiter ('{'))
     in. error ("Json file " + shellQuote (fName) + ": text should start with '{'", false);
   parse (in);
@@ -3276,24 +3281,24 @@ void JsonMap::parse (CharInput& in)
   bool first = true;
   for (;;)
   {
-    Token token (in, false, false);
+    Token token (in, false, false, true);
     if (token. isDelimiter ('}'))
       break;
     if (! first)
     {
       if (! token. isDelimiter (','))
         in. error ("\',\'");
-      token = Token (in, false, false);
+      token = Token (in, false, false, true);
     }
     if (   token. type != Token::eName
         && token. type != Token::eText
        )
       in. error ("name or text");
     string name (token. name);
-    const Token colon (in, false, false);
+    const Token colon (in, false, false, true);
     if (! colon. isDelimiter (':'))
       in. error ("\':\'");
-    token = Token (in, false, false);
+    token = Token (in, false, false, true);
     Json::parse (in, token, this, name);
     first = false;
   }
@@ -4063,21 +4068,31 @@ int Application::run (int argc,
           	else
           	{
           		if (s1. size () != 1) 
-                throw runtime_error ("Single character expected: " + strQuote (s1) + "\n\n" + getInstruction (false));
+                throw runtime_error ("Single character is expected: " + strQuote (s1) + "\n\n" + getInstruction (false));
             }
           else
           	name = s1;
 
           if (name == helpS || (name. empty () && c == helpS [0] && gnu))
           {
-	          const bool screen = ! isRedirected (cout);
-            cout << getHelp (screen) << getDocumentation (screen) << getUpdates (screen) << endl;
-            return 0;
+            if (programArgs. size () > 2) 
+              throw runtime_error ("Single keyword " + strQuote (helpS) + " is expected\n\n" + getInstruction (false));
+            else
+            {
+  	          const bool screen = ! isRedirected (cout);
+              cout << getHelp (screen) << getDocumentation (screen) << getUpdates (screen) << endl;
+              return 0;
+            }
           }
           if (name == versionS || (name. empty () && c == versionS [0] && gnu))
           {
-            cout << version << endl;
-            return 0;
+            if (programArgs. size () > 2) 
+              throw runtime_error ("Single keyword " + strQuote (versionS) + " is expected\n\n" + getInstruction (false));
+            else
+            {
+              cout << version << endl;
+              return 0;
+            }
           }
           
           // key
@@ -4245,10 +4260,7 @@ int Application::run (int argc,
       *os << endl << e. what () << endl;
       exit (1);
     }
-	catch (const std::exception &e) 
-	{ 
-	  errorExitStr (ifS (errno, strerror (errno) + string ("\n")) + e. what ());
-  }
+	catch (const std::exception &e)        { errorExitStr (ifS (errno, strerror (errno) + string ("\n")) + e. what ()); }
 
 
   return 0;

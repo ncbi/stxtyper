@@ -90,8 +90,8 @@ all:	$(BINARIES)
 
 common.o:	common.hpp common.inc
 
-stxtyper.o:  common.hpp common.inc amrfinder_columns.hpp tsv.hpp version.txt 
-stxtyperOBJS=stxtyper.o common.o tsv.o
+stxtyper.o:  common.hpp common.inc amrfinder_columns.hpp tsv.hpp seq.hpp graph.hpp version.txt 
+stxtyperOBJS=stxtyper.o common.o tsv.o seq.o graph.o
 stxtyper:	$(stxtyperOBJS)
 	$(CXX) -o $@ $(stxtyperOBJS) -pthread $(DBDIR)
 
