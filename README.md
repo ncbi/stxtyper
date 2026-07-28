@@ -232,3 +232,7 @@ This typing scheme is only applicable to complete operons defined as 100% covera
 
 * If none of the above rules agree to define a subtype then it is a novel stx type. 
 
+# Citation
+
+Prasad, Arjun Balmiki, Stephanie Abromaitis, Vyacheslav Brover, Michael Feldgarden, Katrine Grimstrup Joensen, Curtis James Kapsak, Rebecca L. Lindsey, Linlin Li, Valeria Michelacci, Susanne Schjørring,Flemming Scheutz, and William Klimke. "Algorithm and Software to Type Stx Operons Acccurately from Assembled Genomic Sequence" Microorganisms 14, no. 8: 1607. https://doi.org/10.3390/microorganisms14081607
+
