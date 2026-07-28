@@ -1,0 +1,45 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite the main paper."
+title: "Algorithm and Software to Type Stx Operons Acc
+curately from Assembled Genomic Sequence"
+authors:
+  - family-names: "Brover"
+    given-names: "Vyacheslav"
+  - family-names: "Prasad"
+    given-names: "Arjun B"
+  - family-names: "Haft"
+    given-names: "Daniel H"
+preferred-citation:
+  type: article
+  authors:
+    - family-names: "Prasad"
+      given-names: "Arjun Balmiki"
+    - family-names: "Abromaitis"
+      given-names: "Stephanie"
+    - family-names: "Brover"
+      given-names: "Vyacheslav"
+    - family-names: "Feldgarden"
+      given-names: "Michael"
+    - family-names: "Joensen"
+      given-names: "Katrine Grimstrup"
+    - family-names: "Kapsak"
+      given-names: "Curtis James"
+    - family-names: "Lindsey"
+      given-names: "Rebecca L."
+    - family-names: "Li"
+      given-names: "Linlin"
+    - family-names: "Michelacci"
+      given-names: "Valeria"
+    - family-names: "Schjørring"
+      given-names: "Susanne"
+    - family-names: "Scheutz"
+      given-names: "Flemming"
+    - family-names: "Klimke"
+      given-names: "William"
+  title: "Algorithm and Software to Type Stx Operons Accurately from Assembled Genomic Sequence"
+  journal: "Microorganisms"
+  year: 2026
+  volume: 14
+  issue: 8
+  pages: 1607
+  doi: "10.3390/microorganisms14081607"

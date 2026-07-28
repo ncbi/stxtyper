@@ -231,3 +231,4 @@ This typing scheme is only applicable to complete operons defined as 100% covera
 </table>
 
 * If none of the above rules agree to define a subtype then it is a novel stx type. 
+
