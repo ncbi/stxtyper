@@ -234,5 +234,5 @@ This typing scheme is only applicable to complete operons defined as 100% covera
 
 # Citation
 
-Prasad, Arjun Balmiki, Stephanie Abromaitis, Vyacheslav Brover, Michael Feldgarden, Katrine Grimstrup Joensen, Curtis James Kapsak, Rebecca L. Lindsey, Linlin Li, Valeria Michelacci, Susanne Schjørring,Flemming Scheutz, and William Klimke. "Algorithm and Software to Type Stx Operons Acccurately from Assembled Genomic Sequence" Microorganisms 14, no. 8: 1607. https://doi.org/10.3390/microorganisms14081607
+Prasad, Arjun Balmiki, Stephanie Abromaitis, Vyacheslav Brover, Michael Feldgarden, Katrine Grimstrup Joensen, Curtis James Kapsak, Rebecca L. Lindsey, Linlin Li, Valeria Michelacci, Susanne Schjørring,Flemming Scheutz, and William Klimke. "Algorithm and Software to Type Stx Operons Acccurately from Assembled Genomic Sequence" Microorganisms 14, no. 8: 1607. PMID:42654954 https://doi.org/10.3390/microorganisms14081607
 
