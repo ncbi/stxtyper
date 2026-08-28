@@ -36,7 +36,7 @@ jobs:
     runs-on: ubuntu-24.04-arm
     steps:
       # No conda on arm_linux by default, trying a prerolled action
-    - uses: conda-incubator/setup-miniconda@v3
+    - uses: conda-incubator/setup-miniconda@v4
       with:
         auto-update-conda: true
     - name: When was this run
