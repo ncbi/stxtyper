@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - name: prerequisites
       run: |
           sudo apt-get update
@@ -31,7 +31,7 @@ jobs:
   arm_linux:
     runs-on: ubuntu-24.04-arm
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - name: prerequisites
       run: |
           sudo apt-get update
